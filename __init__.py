@@ -470,7 +470,7 @@ def ngsutils_all_dir_count(diretorio, gtf):
                       '{bam_caminho} > {fpkm_saida}'.format(gtf_caminho=gtf, bam_caminho=bam, fpkm_saida=bam.replace('.bam','.fpkm_table')))
 
 def main():
-    '''Parte principal do programa onde as outras funcoes sao chamadas'''
+    '''Projeto no github..tentando atualizar'''
 
 
 if __name__ == '__main__':
