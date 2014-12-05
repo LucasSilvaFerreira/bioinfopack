@@ -1,0 +1,477 @@
+# -*- coding: utf-8 -*-
+__author__ = 'lucassilva'
+
+
+import os
+import time
+import sys
+import re
+from glob import glob
+import thread,time
+import multiprocessing
+from multiprocessing import Manager
+
+
+
+
+
+
+
+class thread_processador:
+    ''' Passe essa classe como herança para um script qualquer que deseja ser paralelizado. Nao se esquecendo de
+    sobrescrever o metodo funcao. Os resultados da funcao devem ser adicionados a self.saida_unica.append()
+    '''
+    from itertools import count
+
+    '''A funcao(self,inicio,fim) deve ser sobrescrita utilizando '''
+    def __init__(self,file,n_process,saida_nome):
+        ''' Divide a tarefa em vários processadores diferentes
+        Parametros
+        ----------
+        file : string
+            Arquivo de entrada que será fatiado e dividido entre os processadores
+        n_process : int
+            Numero de processadores utilizados na paralelização
+        saida_nome
+            Nome do arquivo de saida
+            '''
+        __author__ = 'lucas'
+        import thread,time
+
+        '''script generico para fazer uma tread em um arquivo com varias entradas'''
+        self.jobs=[]
+        self.numero_threads= n_process
+        self.arquivo_escolhido= file
+        self.saida_nome=saida_nome
+        self.manager= Manager()
+        self.saida_unica=self.manager.list()
+        self.evento_unico=self.manager.Namespace()
+        self.evento_unico.x=True
+        #abrindo o arquivo desejado
+        arquivo = open(self.arquivo_escolhido,'r').read() #sempre mude para seu arquivo
+        #salvando o arquivo desejado
+        self.saida = open(self.saida_nome,'w') #sempre mude para seu arquivo de saida
+        #guardando o arquivo em um array para que seja feita a divisao
+        self.arquivo_array = [ arquivo_linha for arquivo_linha in arquivo.split('\n') if arquivo_linha ]
+        tamanho_threads= len(self.arquivo_array)
+        range_threads= tamanho_threads/self.numero_threads
+        #print range_threads
+        #
+        for thread_numero in range (0,self.numero_threads):
+           # print thread_numero*range_threads,thread_numero*range_threads+range_threads-1 #estou perdendo o ultimo valor da tabela
+            if thread_numero == 0:
+                inicio_valor=0
+            else:
+                inicio_valor=(thread_numero*range_threads)+1
+
+
+            if thread_numero == 0 :
+                fim_valor = range_threads
+            elif thread_numero != 0 and thread_numero != self.numero_threads-1:
+                fim_valor= ((thread_numero*(range_threads)) + range_threads)+1
+            else:
+                fim_valor = len(self.arquivo_array)-1
+
+            #print thread_numero, inicio_valor, fim_valor
+
+
+            p = multiprocessing.Process(target=self.funcao, args=(inicio_valor,fim_valor))
+            self.jobs.append(p)
+            p.start()
+        for processos in self.jobs:
+            processos.join()
+        #print 'final',len(self.saida_unica)
+        for i in range(len(self.saida_unica)):
+            for linha_i in self.saida_unica[i]:
+                self.saida.write(linha_i+'\n')
+
+    def set_saida(self,array_para_entrar):
+        self.saida_unica.append(array_para_entrar)
+
+
+    def funcao(self,inicio,fim):#teste
+        '''funcao generica que recebe uma parcela do arquivo completo
+        Parametros
+        __________
+        inicio : int
+            inicio da fatia do arquivo original
+        fim : int
+            Fim da fatia do arquivo original
+        '''
+        self.array_temporario=[]
+        '''sobrescreva esse metodos'''
+        self.arquivo_para_cruzar=open('arquivo_para_abrir','r').read()
+        print 'esse metodo deve ser sobrescrito com os parametros presentes nesse arquivo dentro da classe'
+        for array_linha in self.arquivo_array[int(inicio):int(fim)]:
+
+            array_temporario.append(array_linha) # funcao que joga o resultado do seu processamento no array compartilhado entre os processadores
+
+        self.saida_unica.append(self.array_temporario)
+
+        # for escrever in self.array_temporario: #isso deve ser executado apenas no final da funcao
+        #     self.saida.write(escrever+'\n')
+
+
+    def set_false_eventos_unicos(self):
+        self.evento_unico.x=False
+
+def paralel_decorator(n_process):
+    '''@Decorator
+        Todas as funções decoradas devem obrigatoriamente conter o campo *entrada* e *saida* como um de seus
+        parametros. Esse decorador parte do principio que um arquivo paralelizavel entrara na função e uma
+        saida será gerada.
+            n_process : int
+                Numero de processadores utilizados para a paralelização '''
+
+    def decorator_funcao(funcao):
+        def wrapfunc(*args, **kargs):
+            #def __init__(file,n_process,saida_nome):
+
+            jobs=[]
+            numero_threads= n_process
+            #chave de entrada do argumento da funcao generica
+            arquivo_escolhido= kargs['entrada']
+            saida_nome=kargs['saida']
+            manager= Manager()
+            # saida_unica=manager.list()
+            evento_unico=manager.Namespace()
+            evento_unico.x=True
+            #abrindo o arquivo desejado
+            arquivo = open(arquivo_escolhido,'r').read() #sempre mude para seu arquivo
+            #salvando o arquivo desejado
+            saida = open(saida_nome,'w') #sempre mude para seu arquivo de saida
+            #guardando o arquivo em um array para que seja feita a divisao
+            arquivo_array = [ arquivo_linha for arquivo_linha in arquivo.split('\n') if arquivo_linha ]
+            tamanho_threads= len(arquivo_array)
+            range_threads= tamanho_threads/numero_threads
+            nome_arquivos_para_merge=[]
+            nome_arquivos_temp=[]
+            #print range_threads
+            #
+            for thread_numero in range (0,numero_threads):
+               # print thread_numero*range_threads,thread_numero*range_threads+range_threads-1 #estou perdendo o ultimo valor da tabela
+                if thread_numero == 0:
+                    inicio_valor=0
+                else:
+                    inicio_valor=(thread_numero*range_threads)
+                if thread_numero == 0 :
+                    fim_valor = range_threads
+                elif thread_numero != 0 and thread_numero != numero_threads-1:
+                    fim_valor= ((thread_numero*(range_threads)) + range_threads)
+                else:
+                    fim_valor = len(arquivo_array)+1
+                #criando_arquivo_fatiado
+
+                arquivo_nome_temp='{}_{}_{}_{}.temp_paralelo'.format(thread_numero, inicio_valor, fim_valor, funcao.__name__)
+                temp_saida=open(arquivo_nome_temp,'w')
+                temp_escrever= '{}.tempwrite_paralelo'.format(arquivo_nome_temp)
+                nome_arquivos_para_merge.append(temp_escrever) #salvando arquivos para fazer o merge
+                nome_arquivos_temp.append(arquivo_nome_temp) # salvando nome dos arquivos temporarios
+
+                for l_index, linha_write in enumerate(arquivo_array[inicio_valor:fim_valor]):
+
+                    if l_index == (fim_valor-1):
+                        temp_saida.write('{}'.format(linha_write))
+                    else:
+                        temp_saida.write('{}\n'.format(linha_write))
+
+
+                p = multiprocessing.Process(target=funcao, kwargs= {'entrada':arquivo_nome_temp, 'saida':temp_escrever})
+                p.start()
+                jobs.append(p)
+            deltatime= time.time()
+
+
+            for processos in jobs:
+                processos.join()
+
+            #merging
+            print time.time()-deltatime
+            os.system('cat {ins} > {out}'.format(ins=' '.join(nome_arquivos_para_merge), out=saida_nome))
+            #removefiles write
+            #removefiles temp
+            os.system('rm {files}'.format(files=' '.join(nome_arquivos_para_merge)))
+            os.system('rm {files}'.format(files=' '.join(nome_arquivos_temp)))
+
+        return wrapfunc
+    return decorator_funcao
+
+def directory_paralel_decorator(n_process, extention):
+    '''@Decorator
+        Todas as funções decoradas devem obrigatoriamente conter o campo *entrada* .Esse decorador
+        distribui uma quantidade parecida de cada arquivo dentro *diretorio* para um processador
+            n_process : int
+                Numero de processadores utilizados para a paralelização
+            extention : str
+                Final da extensão a ser processada dentro do diretorio
+                '''
+
+    def decorator_funcao(funcao):
+        def wrapfunc(*args, **kargs):
+            #def __init__(file,n_process,saida_nome):
+
+            jobs=[]
+            numero_threads= n_process
+            #processando entrada de kargs['diretorio'] para retirar uma ultima '/' caso lea exista
+            arquivo_escolhido= re.sub('/$','',kargs['diretorio'])
+            #saida_nome=kargs['saida']
+            manager= Manager()
+            # saida_unica=manager.list()
+            evento_unico=manager.Namespace()
+            evento_unico.x=True
+            #abrindo o arquivo desejado
+            arquivo_array = glob('{dir}/*.{ext}'.format(dir=arquivo_escolhido, ext=extention.replace('^.','')))
+            #print 'tamanho: {}'.format(len(arquivo_array))
+            #salvando o arquivo desejado
+            #guardando o arquivo em um array para que seja feita a divisao
+            tamanho_threads= len(arquivo_array)
+            range_threads= tamanho_threads/numero_threads
+            nome_arquivos_para_merge=[]
+            nome_arquivos_temp=[]
+            #print range_threads
+            #
+            for thread_numero in range (0,numero_threads):
+               # print thread_numero*range_threads,thread_numero*range_threads+range_threads-1 #estou perdendo o ultimo valor da tabela
+                if thread_numero == 0:
+                    inicio_valor=0
+                else:
+                    inicio_valor=(thread_numero*range_threads)
+                if thread_numero == 0 :
+                    fim_valor = range_threads
+                elif thread_numero != 0 and thread_numero != numero_threads-1:
+                    fim_valor= ((thread_numero*(range_threads)) + range_threads)
+                else:
+                    fim_valor = len(arquivo_array)+1
+                #print inicio_valor, fim_valor , len(arquivo_array[inicio_valor:fim_valor])
+
+                p = multiprocessing.Process(target=funcao, kwargs= {'diretorio':'\t'.join(arquivo_array[inicio_valor:fim_valor])})
+                p.start()
+                jobs.append(p)
+            for processos in jobs:
+                processos.join()
+
+
+        return wrapfunc
+    return decorator_funcao
+
+
+@paralel_decorator(1)
+def teste (entrada, saida):
+    escrever_disco= open(saida,'w')
+    for x in open(entrada,'r').read().split('\n'):
+        if len(x.split('\t'))> 4 and re.search('pseudogene',x):
+            escrever_disco.write('{}\n'.format(x))
+@directory_paralel_decorator(4, 'apagar')
+def diretorio_teste(diretorio):
+
+    for dir_file in diretorio.split('\t'):
+        print dir_file
+        os.system('head -n 1 {file}'.format(file=dir_file))
+
+
+
+def abrir_arquivo(nome_do_arquivo, delimitador='\n', tabulador_interno='none'):
+    '''Abre um arquivo e retorna um array contendo cada linha lida como um index desse array.
+    Args:
+    nome_nome_do_arquivo (string)= caminho do arquivo a ser aberto.
+    delimitador (string) = delimitador que define o final de cada linha dentro do arquivo. defaut ('\n')
+    tabulador_interno (string) =  Usado para utilizar um delimitador a nivel de linha. Criando um array com a linha splitada
+    pelo delimitador escolhido. defaut('none')
+                                                t (tab)
+                                                s(espaço)
+                                                ;(ponto e virgula)
+                                                :(dois pontos)
+                                                n (enter)
+                                                '''
+    if tabulador_interno == 'none':
+        return [linha for linha in open(nome_do_arquivo, 'r').read().split(delimitador) if linha]
+    elif tabulador_interno == 't':
+        return [linha.split('\t') for linha in open(nome_do_arquivo, 'r').read().split(delimitador) if linha]
+    elif tabulador_interno == 's':
+        return [linha.split(' ') for linha in open(nome_do_arquivo, 'r').read().split(delimitador) if linha]
+    elif tabulador_interno == ';':
+        return [linha.split(';') for linha in open(nome_do_arquivo, 'r').read().split(delimitador)if linha]
+    elif tabulador_interno == ':':
+        return [linha.split(':') for linha in open(nome_do_arquivo, 'r').read().split(delimitador) if linha]
+    elif tabulador_interno == ':':
+        return [linha.split('\n') for linha in open(nome_do_arquivo, 'r').read().split(delimitador) if linha]
+    else:
+        sys.stderr.write('Erro:\nEntre com um delimitador de linhas aceitavel: \n      t (tab) \n      s(espaço) \n'
+                         '      ;(ponto e virgula) \n      :(dois pontos) \n      n(enter)\n')
+        sys.exit(1)
+
+def get_ENSEMBL_using_genename(gene_names, reference_gtf):
+    '''Dado um array com valores de geneName e uma refenrecia GTF, retorna um array  sendo cada linha o ENSEMBL id e o
+        gene_name correspondente.
+
+    Parametros:
+            gene_names (array) =  Um array contendo gene_name unicos
+            reference_gtf (string) = GTF contendo o ID e ENSEMBL_ID
+
+    Return:
+            array contendo um arrays com ENSEMBL e gene_id
+    '''
+    gtf_file = abrir_arquivo(reference_gtf, tabulador_interno='t')
+    hash_gene_ensembl={}
+    for gene_name in set(gene_names):
+        for linha in gtf_file:
+            if 'gene_name' in linha[8] and gene_name == re.search('gene_name "(\S*)"', linha[8]).group(1):
+
+
+                if gene_name in hash_gene_ensembl:
+                    hash_gene_ensembl[gene_name].append(linha[8].split('transcript_id ')[1].split(';')[0].replace('"',''))
+                else:
+                    hash_gene_ensembl[gene_name]=[]
+                    hash_gene_ensembl[gene_name].append(linha[8].split('transcript_id ')[1].split(';')[0].replace('"',''))
+
+    return [[ensembl, x]for x in hash_gene_ensembl for ensembl in  set(hash_gene_ensembl[x])]
+
+def funde_valores_duas_tabelas(tabela_query, tabela_target):
+    ''' Procura os valores da primeira coluna da *tabela_query* em qualquer posição na linha da *tabela_target* não splitada
+        Parametros
+        ----------------
+        tabela_query : array
+            Para cada valor dentro da primeira coluna dessa tabela, procura esse valor no corpo da *tabela_query*
+        tabela_target : array
+            Tabela com valores que possivelmente são encontrados na tabela_query sem split interno com a linha em uma
+            string completa
+        Return
+        ----------------
+            array com a fusão das duas tabelas
+
+    '''
+    if len(tabela_query[0]) > 1:
+        return [ alvo+'\t'+'\t'.join(query) for query in tabela_query for alvo in tabela_target if query[0] in  alvo]
+    else:
+        return [ alvo+'\t'+query for query in tabela_query for alvo in tabela_target if query in  alvo]
+
+def captura_linhas_com_um_valor_igual_em_diferentes_arquivos(arquivo_base, coluna_id_base , arquivo_target):
+    ''' Dado o *arquivo_base* e o *arquivo_target* procura o valor contido na *coluna_id_base* do *arquivo_base* em qualquer
+    campo das linhas do *arquivo_target*
+    Parametros
+    -------------
+        arquivo_base : string
+            Arquivo contendo uma coluna com ids que devem ser procurados no *arquivo_target*
+        arquivo_target : string
+            Arquivo onde o padrão contido na *coluna_id_base* do *arquivo_base* será buscado
+        coluna_id_base : int(0-based)
+            Coluna no *arquivo_base* em que o id será procurado no *arquivo_taget*. O id deve existir em ambos os
+            arquivos
+    Return
+    -------------
+    Retorna as linhas do *arquivo_target* que possuem o id do *arquivo_base*
+    '''
+    base= abrir_arquivo(arquivo_base, tabulador_interno='t')
+    target = abrir_arquivo(arquivo_target)
+    return [linha for id in base for linha in target if id[coluna_id_base] in linha ]
+
+def retorna_somatoria_de_uma_coluna_especifica(arquivo, id_unico_para_fusao , id_da_coluna_somatoria):
+    ''' Dado uma tabela com valores não únicos, mas com ID unicos em uma determinada coluna, Retorna a somatória
+    do valor inteiro de uma das colunas existentes
+
+    Parametros
+    -----------
+        nome_do_arquivo : string
+            Arquivo possuindo ids repetidos, mas com algum identificador único em uma das colunas. Essa coluna deve ser
+            separada por tab.
+        id_unico_para_fusao : int
+            Numero da coluna [zero-based] em que será procurado os id para fundiar as linhas não unicas
+        id_da_coluna_somatoria : int
+            Numero da coluna [zero-based] em que os valores serão fundidos entre os elementos com o mesmo *id_unico_para_fusao*
+    Retorno:
+    ----------
+        array [(id_unico, somatoria)]
+    '''
+    tabela=abrir_arquivo(arquivo,tabulador_interno='t')
+    hash_tabela = {}
+    for linha in tabela:
+        if linha[id_unico_para_fusao] in  hash_tabela:
+            hash_tabela[linha[id_unico_para_fusao]] += int(linha[id_da_coluna_somatoria])
+        else:
+            hash_tabela[linha[id_unico_para_fusao]] = int(linha[id_da_coluna_somatoria])
+
+    return sorted([[x, hash_tabela[x]] for x in hash_tabela], key=lambda valor: valor[1],reverse=True)
+
+def all_dir_wigfix_to_bigwig(diretorio, chrom_sizes_file):
+    """ Converte todos os arquivos(wigfix) em um determinado diretorio para o formato bigwig
+    Parametros
+    ----------
+    diretorio : string
+        Diretorio contendo os arquivos wigfix ex: /home/arquivos/
+    chrom_sizes_file : string
+        Nome do arquivo com o tamanho dos cromossomos (utilizar ferramenta fetchChromSizes)
+
+    """
+
+    arquivos= glob('{}*.wigFix'.format(diretorio))
+    print arquivos
+
+    for arquivo in arquivos:
+        print 'converting {}...'.format(arquivo)
+        os.system('wigToBigWig {arquivo_x} {chrom_sizes_file} {saida}'.format(arquivo_x=arquivo,
+                                                            chrom_sizes_file=chrom_sizes_file,
+                                                            saida="{}.bw".format(arquivo.split('/').pop().rsplit('.',1)[0]))
+                                                            )
+
+def string_window_generator(string_in, window):
+    '''Retorna um generator dado uma string e um intervalo desejado
+
+    Parametros
+     ----------
+    string_in: str
+        String base onde a janela será cria
+    window : int
+        Intervalo entre cada fatia da string
+
+    return
+    -----------
+        Tuple com o inicio e final da janela
+        ex: [0,10]
+     '''
+    for index, valor in enumerate(string_in):
+        if (index+window)<= len(string_in)-1:
+             yield [index, index+window]
+
+def ngsutils_all_dir_count(diretorio, gtf):
+    '''faz a contagem e cobertura de reads dado diretorio com arquivos bam e um arquivo gtf
+    Parametros
+    ----------
+    diretorio : string
+        Diretorio onde os arquivos .bam estão presentes (obs: todos os arquivos bam dentro dessa pasta serão
+        utilizados)
+    gtf : string
+        Caminho completo para o arquivo gtf
+    '''
+
+    diretorio_bai =  glob('{}*.bai'.format(diretorio))
+    diretorio_bam =  glob('{}*.bam'.format(diretorio))
+
+    for contador,bam in enumerate(diretorio_bam):
+        #testando existencia dos arquivos index .bai
+        sys.stdout.write('{}\{} concluido...\n'.format(contador, len(diretorio_bam)))
+        if bam.replace('.bam','.bai') in diretorio_bai:
+            #caso exista o arquivo index (bai)
+            sys.stderr.write('arquivo index (bai) encontrado {}...\n iniciando analise...\n'.format(bam))
+            os.system('bamutils count'
+                      ' -gtf {gtf_caminho}'
+                      ' -coverage'
+                      ' -fpkm'
+                      ' -norm mapped '
+                      '{bam_caminho} > {fpkm_saida}'.format(gtf_caminho=gtf, bam_caminho=bam, fpkm_saida=bam.replace('.bam','.fpkm_table')))
+        #criando arquivo bai
+        else:
+            sys.stderr.write('creating bai to file {}...\n'.format(bam))
+            os.system('samtools index {}'.format(bam))
+            os.system('bamutils count'
+                      ' -gtf {gtf_caminho}'
+                      ' -coverage'
+                      ' -fpkm'
+                      ' -norm mapped '
+                      '{bam_caminho} > {fpkm_saida}'.format(gtf_caminho=gtf, bam_caminho=bam, fpkm_saida=bam.replace('.bam','.fpkm_table')))
+
+def main():
+    '''Parte principal do programa onde as outras funcoes sao chamadas'''
+
+
+if __name__ == '__main__':
+    sys.exit(main())
