@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 __author__ = 'lucassilva'
 
-
+import numpy
 import os
+#import math
 import time
 import sys
 import re
@@ -10,11 +11,6 @@ from glob import glob
 import thread,time
 import multiprocessing
 from multiprocessing import Manager
-
-
-
-
-
 
 
 class thread_processador:
@@ -254,7 +250,6 @@ def directory_paralel_decorator(n_process, extention):
         return wrapfunc
     return decorator_funcao
 
-
 @paralel_decorator(1)
 def teste (entrada, saida):
     escrever_disco= open(saida,'w')
@@ -267,8 +262,6 @@ def diretorio_teste(diretorio):
     for dir_file in diretorio.split('\t'):
         print dir_file
         os.system('head -n 1 {file}'.format(file=dir_file))
-
-
 
 def abrir_arquivo(nome_do_arquivo, delimitador='\n', tabulador_interno='none'):
     '''Abre um arquivo e retorna um array contendo cada linha lida como um index desse array.
@@ -345,7 +338,8 @@ def funde_valores_duas_tabelas(tabela_query, tabela_target):
     else:
         return [ alvo+'\t'+query for query in tabela_query for alvo in tabela_target if query in  alvo]
 
-def captura_linhas_com_um_valor_igual_em_diferentes_arquivos(arquivo_base, coluna_id_base , arquivo_target):
+def captura_linhas_com_um_valor_igual_em_diferentes_arquivos(arquivo_base, coluna_id_base , arquivo_target, verse= True
+                                                             , return_target=True, cap_linha_no_target=-1):
     ''' Dado o *arquivo_base* e o *arquivo_target* procura o valor contido na *coluna_id_base* do *arquivo_base* em qualquer
     campo das linhas do *arquivo_target*
     Parametros
@@ -357,15 +351,38 @@ def captura_linhas_com_um_valor_igual_em_diferentes_arquivos(arquivo_base, colun
         coluna_id_base : int(0-based)
             Coluna no *arquivo_base* em que o id será procurado no *arquivo_taget*. O id deve existir em ambos os
             arquivos
+        verse : bool
+            Se *verse* for igual a False, retorna apenas as linhas não encontradas (default= True)
+        return_target : Bool
+            True=Retorna na saida o arquivo target
+            False= Retorna na saida o arquivo base
+        cap_linha_no_target : int defaut (-1)
+            adiciona uma informação contida em uma colubna especifica do arquivo target ao final da impressão das
+            saidas query encontradas na busca. O valor int corresponde ao numero da coluna que será capturada,
+            sendo essa previamente separada por \tab
     Return
     -------------
-    Retorna as linhas do *arquivo_target* que possuem o id do *arquivo_base*
+    Retorna um array com  as linhas do *arquivo_target* que possuem o id do *arquivo_base*
     '''
+
+    convertendo = coluna_id_base
+    coluna_id_base = int(convertendo )
     base= abrir_arquivo(arquivo_base, tabulador_interno='t')
     target = abrir_arquivo(arquivo_target)
-    return [linha for id in base for linha in target if id[coluna_id_base] in linha ]
+    if verse:
+        if return_target:
+            return [linha for id in base for linha in target if id[coluna_id_base] in linha]
+        else: #retorna o arquivo base
+            if cap_linha_no_target == -1: # não retorna com a adição da ultima linha do target
+                return [id for id in base for linha in target if id[coluna_id_base] in linha]
+            else: #retorna com a adicao da ultima linha sendo um valor determinado dentro do target
+                return [('\t'.join(id)+ '\t' + linha.split('\t')[cap_linha_no_target]).split('\t')
+                        for id in base for linha in target if id[coluna_id_base] in linha]
+    else: # retorna as linhas que não foram encontradas
+            return [linha for id in base for linha in target if id[coluna_id_base] not in linha]
 
-def retorna_somatoria_de_uma_coluna_especifica(arquivo, id_unico_para_fusao , id_da_coluna_somatoria):
+
+def retorna_somatoria_de_uma_coluna_especifica(arquivo, id_unico_para_fusao , id_da_coluna_somatoria, media=False):
     ''' Dado uma tabela com valores não únicos, mas com ID unicos em uma determinada coluna, Retorna a somatória
     do valor inteiro de uma das colunas existentes
 
@@ -378,19 +395,31 @@ def retorna_somatoria_de_uma_coluna_especifica(arquivo, id_unico_para_fusao , id
             Numero da coluna [zero-based] em que será procurado os id para fundiar as linhas não unicas
         id_da_coluna_somatoria : int
             Numero da coluna [zero-based] em que os valores serão fundidos entre os elementos com o mesmo *id_unico_para_fusao*
+	media : bool	   
+	    If true, return the mean of sum
+	    
     Retorno:
     ----------
         array [(id_unico, somatoria)]
     '''
-    tabela=abrir_arquivo(arquivo,tabulador_interno='t')
+    tabela=abrir_arquivo(arquivo, tabulador_interno='t')
     hash_tabela = {}
     for linha in tabela:
-        if linha[id_unico_para_fusao] in  hash_tabela:
-            hash_tabela[linha[id_unico_para_fusao]] += int(linha[id_da_coluna_somatoria])
-        else:
-            hash_tabela[linha[id_unico_para_fusao]] = int(linha[id_da_coluna_somatoria])
-
-    return sorted([[x, hash_tabela[x]] for x in hash_tabela], key=lambda valor: valor[1],reverse=True)
+        if media == False:
+            if linha[id_unico_para_fusao] in  hash_tabela:
+                hash_tabela[linha[id_unico_para_fusao]] += float(linha[id_da_coluna_somatoria])
+            else:
+                hash_tabela[linha[id_unico_para_fusao]] = float(linha[id_da_coluna_somatoria])
+        if media == True:
+	    if linha[id_unico_para_fusao] in  hash_tabela:
+                hash_tabela[linha[id_unico_para_fusao]].append(float(linha[id_da_coluna_somatoria]))
+            else:
+	        hash_tabela[linha[id_unico_para_fusao]]=[]
+                hash_tabela[linha[id_unico_para_fusao]].append(float(linha[id_da_coluna_somatoria]))
+    if media==False:
+        return sorted([[x, hash_tabela[x]] for x in hash_tabela], key=lambda valor: valor[1],reverse=True)
+    else:
+        return sorted([[x, numpy.mean(hash_tabela[x])] for x in hash_tabela], key=lambda valor: valor[1],reverse=True)
 
 def all_dir_wigfix_to_bigwig(diretorio, chrom_sizes_file):
     """ Converte todos os arquivos(wigfix) em um determinado diretorio para o formato bigwig
@@ -468,6 +497,35 @@ def ngsutils_all_dir_count(diretorio, gtf):
                       ' -fpkm'
                       ' -norm mapped '
                       '{bam_caminho} > {fpkm_saida}'.format(gtf_caminho=gtf, bam_caminho=bam, fpkm_saida=bam.replace('.bam','.fpkm_table')))
+
+def bed_start_site_to_tss(bed_string, down=1000, up=1000):
+    '''dado uma coordenada *bed_string* retorna aquela string com o inicio e fim da coordenada sendo a extensão
+        do start site dessa sequencia dada
+        Parametros:
+        -------------------
+        bed_string : string bed separada por tab
+            String no formato bed
+        down/up : int defaut(1000)
+            Quantidade de nuceotideos que serão extendidas partindo do start site do bed dado
+
+        '''
+
+    if '\t-\t' in bed_string:
+        bed_string_tabulada =  bed_string.split('\t')
+        ref_coord = int(bed_string_tabulada[1])
+        n_start= ref_coord + up
+        n_end= ref_coord - down
+        bed_string_tabulada[1]= n_start
+        bed_string_tabulada[2]= n_end
+        return '\t'.join(bed_string_tabulada)
+    else:
+        bed_string_tabulada =  bed_string.split('\t')
+        ref_coord = int(bed_string_tabulada[1])
+        n_start= ref_coord + down
+        n_end= ref_coord - up
+        bed_string_tabulada[1]= n_start
+        bed_string_tabulada[2]= n_end
+        return '\t'.join(bed_string_tabulada)
 
 def main():
     '''Projeto no github..tentando atualizar'''
