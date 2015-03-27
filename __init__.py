@@ -111,6 +111,64 @@ class thread_processador:
     def set_false_eventos_unicos(self):
         self.evento_unico.x=False
 
+def paralel_task(n_process):
+    '''@Decorator
+    Todas as funções decoradas devem obrigatoriamente conter o campo *entrada* como um de seus
+    parametros. Esse decorador parte do principio que um arquivo paralelizavel entrara na função e uma
+    saida será gerada.
+    n_process : int
+         Numero de processadores utilizados para a paralelização '''
+    def decorator_funcao(funcao):
+        def wrapfunc(*args, **kargs):
+            #def __init__(file,n_process,saida_nome):
+            #print kargs
+            jobs=[]
+            numero_threads= n_process
+            #print kargs
+            #chave de entrada do argumento da funcao generica
+            arquivo_escolhido= kargs['entrada']
+            manager= Manager()
+            # saida_unica=manager.list()
+            evento_unico=manager.Namespace()
+            evento_unico.x=True
+            #abrindo o arquivo desejado
+            try:
+                arquivo = iter(arquivo_escolhido)
+            except TypeError, te:
+                print some_object, 'Entre com uma variavel de entrada iterble'
+                print sys.exit()
+            #guardando o arquivo em um array para que seja feita a divisao
+            arquivo_array = [ arquivo_linha for arquivo_linha in arquivo if arquivo_linha ]
+            tamanho_threads= len(arquivo_array)
+            range_threads= tamanho_threads/numero_threads
+
+            #
+            for thread_numero in range (0,numero_threads):
+               # print thread_numero*range_threads,thread_numero*range_threads+range_threads-1 #estou perdendo o ultimo valor da tabela
+                if thread_numero == 0:
+                    inicio_valor=0
+                else:
+                    inicio_valor=(thread_numero*range_threads)
+                if thread_numero == 0 :
+                    fim_valor = range_threads
+                elif thread_numero != 0 and thread_numero != numero_threads-1:
+                    fim_valor= ((thread_numero*(range_threads)) + range_threads)
+                else:
+                    fim_valor = len(arquivo_array)+1
+
+                p = multiprocessing.Process(target=funcao, kwargs= {'entrada':arquivo_array[inicio_valor:fim_valor]})
+                p.start()
+                jobs.append(p)
+
+            deltatime= time.time()
+
+
+            for processos in jobs:
+                processos.join()
+
+        return wrapfunc
+    return decorator_funcao
+
 def paralel_decorator(n_process):
     '''@Decorator
         Todas as funções decoradas devem obrigatoriamente conter o campo *entrada* e *saida* como um de seus
@@ -122,9 +180,10 @@ def paralel_decorator(n_process):
     def decorator_funcao(funcao):
         def wrapfunc(*args, **kargs):
             #def __init__(file,n_process,saida_nome):
-
+            print kargs
             jobs=[]
             numero_threads= n_process
+            #print kargs
             #chave de entrada do argumento da funcao generica
             arquivo_escolhido= kargs['entrada']
             saida_nome=kargs['saida']
@@ -250,12 +309,13 @@ def directory_paralel_decorator(n_process, extention):
         return wrapfunc
     return decorator_funcao
 
-@paralel_decorator(1)
+@paralel_decorator(10)
 def teste (entrada, saida):
     escrever_disco= open(saida,'w')
     for x in open(entrada,'r').read().split('\n'):
         if len(x.split('\t'))> 4 and re.search('pseudogene',x):
             escrever_disco.write('{}\n'.format(x))
+
 @directory_paralel_decorator(4, 'apagar')
 def diretorio_teste(diretorio):
 
@@ -338,7 +398,7 @@ def funde_valores_duas_tabelas(tabela_query, tabela_target):
     else:
         return [ alvo+'\t'+query for query in tabela_query for alvo in tabela_target if query in  alvo]
 
-def captura_linhas_com_um_valor_igual_em_diferentes_arquivos(arquivo_base, coluna_id_base , arquivo_target, verse= True
+def captura_linhas_com_um_valor_igual_em_diferentes_arquivos(arquivo_base, coluna_id_base, arquivo_target, verse= True
                                                              , return_target=True, cap_linha_no_target=-1):
     ''' Dado o *arquivo_base* e o *arquivo_target* procura o valor contido na *coluna_id_base* do *arquivo_base* em qualquer
     campo das linhas do *arquivo_target*
@@ -381,12 +441,11 @@ def captura_linhas_com_um_valor_igual_em_diferentes_arquivos(arquivo_base, colun
     else: # retorna as linhas que não foram encontradas
             return [linha for id in base for linha in target if id[coluna_id_base] not in linha]
 
-
 def retorna_somatoria_de_uma_coluna_especifica(arquivo, id_unico_para_fusao , id_da_coluna_somatoria, media=False):
     ''' Dado uma tabela com valores não únicos, mas com ID unicos em uma determinada coluna, Retorna a somatória
     do valor inteiro de uma das colunas existentes
 
-    Parametros
+    Parâmetros
     -----------
         nome_do_arquivo : string
             Arquivo possuindo ids repetidos, mas com algum identificador único em uma das colunas. Essa coluna deve ser
@@ -395,13 +454,13 @@ def retorna_somatoria_de_uma_coluna_especifica(arquivo, id_unico_para_fusao , id
             Numero da coluna [zero-based] em que será procurado os id para fundiar as linhas não unicas
         id_da_coluna_somatoria : int
             Numero da coluna [zero-based] em que os valores serão fundidos entre os elementos com o mesmo *id_unico_para_fusao*
-	media : bool	   
-	    If true, return the mean of sum
-	    
-    Retorno:
-    ----------
-        array [(id_unico, somatoria)]
-    '''
+        media : bool
+            If true, return the mean of sum
+
+        Retorno:
+        ----------
+            array [(id_unico, somatoria)]
+        '''
     tabela=abrir_arquivo(arquivo, tabulador_interno='t')
     hash_tabela = {}
     for linha in tabela:
@@ -411,10 +470,10 @@ def retorna_somatoria_de_uma_coluna_especifica(arquivo, id_unico_para_fusao , id
             else:
                 hash_tabela[linha[id_unico_para_fusao]] = float(linha[id_da_coluna_somatoria])
         if media == True:
-	    if linha[id_unico_para_fusao] in  hash_tabela:
+            if linha[id_unico_para_fusao] in  hash_tabela:
                 hash_tabela[linha[id_unico_para_fusao]].append(float(linha[id_da_coluna_somatoria]))
             else:
-	        hash_tabela[linha[id_unico_para_fusao]]=[]
+                hash_tabela[linha[id_unico_para_fusao]]=[]
                 hash_tabela[linha[id_unico_para_fusao]].append(float(linha[id_da_coluna_somatoria]))
     if media==False:
         return sorted([[x, hash_tabela[x]] for x in hash_tabela], key=lambda valor: valor[1],reverse=True)
@@ -498,7 +557,7 @@ def ngsutils_all_dir_count(diretorio, gtf):
                       ' -norm mapped '
                       '{bam_caminho} > {fpkm_saida}'.format(gtf_caminho=gtf, bam_caminho=bam, fpkm_saida=bam.replace('.bam','.fpkm_table')))
 
-def bed_start_site_to_tss(bed_string, down=1000, up=1000):
+def bed_start_site_to_tss(bed_string, down = 1000, up = 1000, not_reverse= True):
     '''dado uma coordenada *bed_string* retorna aquela string com o inicio e fim da coordenada sendo a extensão
         do start site dessa sequencia dada
         Parametros:
@@ -507,25 +566,44 @@ def bed_start_site_to_tss(bed_string, down=1000, up=1000):
             String no formato bed
         down/up : int defaut(1000)
             Quantidade de nuceotideos que serão extendidas partindo do start site do bed dado
-
+        not_reverse : true
+            Deixa os valores com coordenadas menores na primeria posição mesmo que a fita seja negativa
         '''
-
+    saida_str = ''
     if '\t-\t' in bed_string:
         bed_string_tabulada =  bed_string.split('\t')
-        ref_coord = int(bed_string_tabulada[1])
+        ref_coord = int(bed_string_tabulada[2])
         n_start= ref_coord + up
         n_end= ref_coord - down
-        bed_string_tabulada[1]= n_start
-        bed_string_tabulada[2]= n_end
-        return '\t'.join(bed_string_tabulada)
+        bed_string_tabulada[1]= str(n_start)
+        bed_string_tabulada[2]= str(n_end)
+        #print (n_start)-(n_end)
+        saida_str = '\t'.join(bed_string_tabulada)
     else:
         bed_string_tabulada =  bed_string.split('\t')
         ref_coord = int(bed_string_tabulada[1])
-        n_start= ref_coord + down
-        n_end= ref_coord - up
-        bed_string_tabulada[1]= n_start
-        bed_string_tabulada[2]= n_end
-        return '\t'.join(bed_string_tabulada)
+        n_start= ref_coord - down
+        n_end= ref_coord + up
+        bed_string_tabulada[1]= str(n_start)
+        bed_string_tabulada[2]= str(n_end)
+        saida_str= '\t'.join(bed_string_tabulada)
+
+    saida_splitada= saida_str.split('\t')
+
+    if int(saida_splitada[1]) >= 0 and  int(saida_splitada[2]) >= 0 : #caso nao exista valores negativos
+        if not_reverse:
+            if int(saida_splitada[1]) > int(saida_splitada[2]):
+                temp1= str(saida_splitada[1])
+                temp2= str(saida_splitada[2])
+                saida_splitada[1]=temp2
+                saida_splitada[2]=temp1
+                return '\t'.join(saida_splitada)
+            else:
+                return saida_str
+        else: #caso não queira o dado modificado para reversed
+            return saida_str
+    else:
+        sys.stderr.write('valor proximo da borda do cromossomo: '+ saida_splitada[1]+'\n')
 
 def main():
     '''Projeto no github..tentando atualizar'''
