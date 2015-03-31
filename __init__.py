@@ -323,6 +323,32 @@ def diretorio_teste(diretorio):
         print dir_file
         os.system('head -n 1 {file}'.format(file=dir_file))
 
+def fix_bed12_strand_error(gtf_table_format):
+    '''Given a bed12 file, search for non compatible lines (end > start) and fix it
+    ex:
+    chr1	169857816	169822913	ENST00000367770.1	100	-	169857816	169822913	255,0,0	13	213,186,114,57,103,112,78,140,185,172,162,695,699	0,-10042,-12698,-14980,-18421,-19748,-21780,-24307,-26063,-29635,-32880,-34406,-35602
+    chr1	169764180	169798955	ENST00000413811.2	100	+	169764180	169798955	255,0,0	11	174,40,105,141,166,85,139,81,65,149,552	0,3879,7581,8129,9035,10964,12751,26639,28368,32011,34223
+
+    '''
+    return_table=[]
+    for line in gtf_table_format:
+        if line:
+            strand=  line.split('\t')[5]
+            start =  int(line.split('\t')[1])
+            stop =  int(line.split('\t')[2])
+            if stop > start :
+                #inverting coord
+                stop, start = start, stop
+                tabbed_line =  line.split('\t')
+                #fixing position
+                tabbed_line[1]=start
+                tabbed_line[2]=stop
+                tabbed_line[10] = tabbed_line[10].replace('-','')
+                return_table.append("\t".join(tabbed_line))
+            else:
+                return_table.append(line)
+    return return_table
+
 def abrir_arquivo(nome_do_arquivo, delimitador='\n', tabulador_interno='none'):
     '''Abre um arquivo e retorna um array contendo cada linha lida como um index desse array.
     Args:
