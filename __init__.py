@@ -331,22 +331,26 @@ def fix_bed12_strand_error(gtf_table_format):
 
     '''
     return_table=[]
-    for line in gtf_table_format:
+    for n_line, line in enumerate(gtf_table_format):
         if line:
-            strand=  line.split('\t')[5]
-            start =  int(line.split('\t')[1])
-            stop =  int(line.split('\t')[2])
-            if stop > start :
+            if len(line) < 10:
+                sys.stderr.write( 'Line: {} has a incompatible bed12 size.\n'.format(str(n_line)))
+                pass
+            strand=  line[5]
+            start =  int(line[1])
+            stop =  int(line[2])
+            if stop < start :
                 #inverting coord
                 stop, start = start, stop
-                tabbed_line =  line.split('\t')
+                tabbed_line =  line
                 #fixing position
-                tabbed_line[1]=start
-                tabbed_line[2]=stop
-                tabbed_line[10] = tabbed_line[10].replace('-','')
+                tabbed_line[1]=str(start)
+                tabbed_line[2]=str(stop)
+                tabbed_line[11] = tabbed_line[11].replace('-','')
                 return_table.append("\t".join(tabbed_line))
             else:
-                return_table.append(line)
+                line[11] = line[11].replace('-', '')
+                return_table.append("\t".join(line))
     return return_table
 
 def abrir_arquivo(nome_do_arquivo, delimitador='\n', tabulador_interno='none'):
@@ -455,6 +459,7 @@ def captura_linhas_com_um_valor_igual_em_diferentes_arquivos(arquivo_base, colun
     coluna_id_base = int(convertendo )
     base= abrir_arquivo(arquivo_base, tabulador_interno='t')
     target = abrir_arquivo(arquivo_target)
+    print 'carregado'
     if verse:
         if return_target:
             return [linha for id in base for linha in target if id[coluna_id_base] in linha]
@@ -466,6 +471,100 @@ def captura_linhas_com_um_valor_igual_em_diferentes_arquivos(arquivo_base, colun
                         for id in base for linha in target if id[coluna_id_base] in linha]
     else: # retorna as linhas que não foram encontradas
             return [linha for id in base for linha in target if id[coluna_id_base] not in linha]
+
+def getSameValues(arquivo_base, coluna_id_base, arquivo_target, coluna_id_target, verse= True
+                                                             , return_target=True, cap_linha_no_target=-1):
+    ''' Dado o *arquivo_base* e o *arquivo_target* procura o valor contido na *coluna_id_base* do *arquivo_base* em qualquer
+    campo das linhas do *arquivo_target*. Obs= Valores redundantes são considerados
+    Parametros
+    -------------
+        arquivo_base : string
+            Arquivo contendo uma coluna com ids que devem ser procurados no *arquivo_target*
+        arquivo_target : string
+            Arquivo onde o padrão contido na *coluna_id_base* do *arquivo_base* será buscado
+        coluna_id_base : int(0-based)
+            Coluna no *arquivo_base* em que o id será procurado no *arquivo_taget*. O id deve existir em ambos os
+            arquivos
+        coluna_id_target: int(0-based)
+            Coluna no *arquivo_target* em que o valor de *arquivo_base* será procurado
+        verse : bool
+            Se *verse* for igual a False, retorna apenas as linhas não encontradas (default= True)
+        return_target : Bool
+            True=Retorna na saida o arquivo target
+            False= Retorna na saida o arquivo base
+        cap_linha_no_target : int defaut (-1)
+            adiciona uma informação contida em uma colubna especifica do arquivo target ao final da impressão das
+            saidas query encontradas na busca. O valor int corresponde ao numero da coluna que será capturada,
+            sendo essa previamente separada por \tab.
+            obs: Linhas em que os valores podem ser redundantes serão retornados separados por ,
+    Return
+    -------------
+    Retorna um array com  as linhas do *arquivo_target* que possuem o id do *arquivo_base*
+    '''
+
+
+    coluna_id_base = int(coluna_id_base)
+    coluna_id_target =  int(coluna_id_target)
+    base= abrir_arquivo(arquivo_base, tabulador_interno='t')
+    target = abrir_arquivo(arquivo_target, tabulador_interno='t')
+    target_hash = {}
+    for t_linha in target:
+        if len(t_linha) >= coluna_id_target:
+            if t_linha[coluna_id_target] in target_hash:
+                target_hash[t_linha[coluna_id_target]].append(t_linha)
+            else:
+                target_hash[t_linha[coluna_id_target]]=[]
+                target_hash[t_linha[coluna_id_target]].append(t_linha)
+    print 'carregado'
+    target ='zerada'
+    out_array_table=[]
+    if verse:
+        if return_target:
+            for id in base:
+                if len(id)>= coluna_id_base and id[coluna_id_base] in target_hash:
+                    #acrescenta cada valor dentro do array de saida
+                    for valor in target_hash[id[coluna_id_base]]:
+                        out_array_table.append('\t'.join(valor))
+            #return [linha for id in base for linha in target if id[coluna_id_base] in linha[coluna_id_target]]
+
+        else: #retorna o arquivo base
+            if cap_linha_no_target == -1: # não retorna com a adição da ultima linha do target
+                for id in base:
+                    if len(id)>= coluna_id_base and id[coluna_id_base] in target_hash:
+                        #acrescenta cada valor dentro do array de saida
+                        out_array_table.append('\t'.join(id))
+
+
+                #return [id for id in base for linha in target if id[coluna_id_base] in linha[coluna_id_target]]
+
+
+            else: #retorna com a adicao da ultima linha sendo um valor determinado dentro do target
+                for id in base:
+                    if len(id)>= coluna_id_base and id[coluna_id_base] in target_hash:
+                        #acrescenta cada valor dentro do array de saida
+                        valores_colunas=[]
+                        for valor in target_hash[id[coluna_id_base]]:
+                            valores_colunas.append(target_hash[id[coluna_id_base]][cap_linha_no_target])
+                        id.append(','.join(valores_colunas))
+                        out_array_table.append(id)
+
+
+
+                #return [('\t'.join(id)+ '\t' + str(coluna_id_target[cap_linha_no_target]))
+                #        for id in base for linha in target if id[coluna_id_base] in linha[coluna_id_target]]
+
+
+    else: # retorna as linhas que não foram encontradas
+        hash_base = {id[coluna_id_base]:id for id in base if len(id) >= coluna_id_base }
+        base = 'zerada'
+        for chave_target in target_hash:
+            if chave_target not in hash_base:
+                for valor in target_hash[chave_target]:
+                    out_array_table.append('\t'.join(valor))
+
+            #return [linha for id in base for linha in target if id[coluna_id_base] not in linha[coluna_id_target]]
+
+    return out_array_table
 
 def retorna_somatoria_de_uma_coluna_especifica(arquivo, id_unico_para_fusao , id_da_coluna_somatoria, media=False):
     ''' Dado uma tabela com valores não únicos, mas com ID unicos em uma determinada coluna, Retorna a somatória
