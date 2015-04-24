@@ -568,7 +568,7 @@ def getSameValues(arquivo_base, coluna_id_base, arquivo_target, coluna_id_target
     Retorna um array com  as linhas do *arquivo_target* que possuem o id do *arquivo_base*
     '''
 
-
+    sys.stderr.write("Sempre confira se as linhas com as chaves estão corretas! As hashs dependem disso :)" + "\n")
     coluna_id_base = int(coluna_id_base)
     coluna_id_target =  int(coluna_id_target)
     base= abrir_arquivo(arquivo_base, tabulador_interno='t')
@@ -577,15 +577,17 @@ def getSameValues(arquivo_base, coluna_id_base, arquivo_target, coluna_id_target
     for t_linha in target:
         if len(t_linha) >= coluna_id_target:
             if t_linha[coluna_id_target] in target_hash:
+                #sys.stderr.write("repetido" + "\n")
                 target_hash[t_linha[coluna_id_target]].append(t_linha)
             else:
+                #sys.stderr.write("diferente" + "\n")
                 target_hash[t_linha[coluna_id_target]]=[]
                 target_hash[t_linha[coluna_id_target]].append(t_linha)
     print 'carregado'
     target ='zerada'
     out_array_table=[]
     if verse:
-        if return_target:
+        if not return_target:
             for id in base:
                 if len(id)>= coluna_id_base and id[coluna_id_base] in target_hash:
                     #acrescenta cada valor dentro do array de saida
@@ -594,7 +596,9 @@ def getSameValues(arquivo_base, coluna_id_base, arquivo_target, coluna_id_target
             #return [linha for id in base for linha in target if id[coluna_id_base] in linha[coluna_id_target]]
 
         else: #retorna o arquivo base
+            sys.stderr.write("retorna arquivo target" + "\n")
             if cap_linha_no_target == -1: # não retorna com a adição da ultima linha do target
+                sys.stderr.write("not capture line" + "\n")
                 for id in base:
                     if len(id)>= coluna_id_base and id[coluna_id_base] in target_hash:
                         #acrescenta cada valor dentro do array de saida
@@ -605,12 +609,17 @@ def getSameValues(arquivo_base, coluna_id_base, arquivo_target, coluna_id_target
 
 
             else: #retorna com a adicao da ultima linha sendo um valor determinado dentro do target
+                sys.stderr.write("Retorna linha com adicao" + "\n")
                 for id in base:
+                    #print id[coluna_id_base]
                     if len(id)>= coluna_id_base and id[coluna_id_base] in target_hash:
                         #acrescenta cada valor dentro do array de saida
                         valores_colunas=[]
                         for valor in target_hash[id[coluna_id_base]]:
-                            valores_colunas.append(target_hash[id[coluna_id_base]][cap_linha_no_target])
+                            #print valor
+                            #print '|------>', id, coluna_id_base, id[coluna_id_base], target_hash[id[coluna_id_base]][cap_linha_no_target]
+                            valores_colunas.append(valor[cap_linha_no_target])
+                        #print valores_colunas
                         id.append(','.join(valores_colunas))
                         out_array_table.append(id)
 
