@@ -344,6 +344,7 @@ def intersect_interaction_data(interaction_file, bed_file, bed_col=None):
          chr2 1 200 a chr2 500 1000 z,x,r
     '''
     #Checking interaction_file type
+    sys.stderr.wirte("FUnção ainda não terminada " +"\n")
     if type(interaction_file) == str:
          inter_file = abrir_arquivo(interaction_file, tabulador_interno='t')
     elif type(interaction_file) == list:
@@ -369,8 +370,23 @@ def intersect_interaction_data(interaction_file, bed_file, bed_col=None):
 
 
 
+def fix_bed6_strand_error(bed6_file_list):
+    '''Given a bed6 file (3 line min size). Fix that lines which have stop  small than starts
+     Parameters
+     _____________
+     bed6_file_array (list_tab_sep)
 
-
+     Returns:
+     _____________
+     array that bed6 file was fixed
+     '''
+    out_return = []
+    for line in bed6_file_list:
+        if len(line) >=3:
+            if int(line[1]) < int(line[2]):
+                #Inverting data
+                line[1],line[2] = line[2],line[1]
+            out_return.append(line)
 
 
 def fix_bed12_strand_error(gtf_table_format):
