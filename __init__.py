@@ -11,6 +11,7 @@ from glob import glob
 import thread,time
 import multiprocessing
 from multiprocessing import Manager
+import pybedtools
 
 
 class thread_processador:
@@ -100,7 +101,7 @@ class thread_processador:
         print 'esse metodo deve ser sobrescrito com os parametros presentes nesse arquivo dentro da classe'
         for array_linha in self.arquivo_array[int(inicio):int(fim)]:
 
-            array_temporario.append(array_linha) # funcao que joga o resultado do seu processamento no array compartilhado entre os processadores
+            self.array_temporario.append(array_linha) # funcao que joga o resultado do seu processamento no array compartilhado entre os processadores
 
         self.saida_unica.append(self.array_temporario)
 
@@ -135,7 +136,7 @@ def paralel_task(n_process):
             try:
                 arquivo = iter(arquivo_escolhido)
             except TypeError, te:
-                print some_object, 'Entre com uma variavel de entrada iterble'
+                print te, 'Entre com uma variavel de entrada iterble'
                 print sys.exit()
             #guardando o arquivo em um array para que seja feita a divisao
             arquivo_array = [ arquivo_linha for arquivo_linha in arquivo if arquivo_linha ]
@@ -322,6 +323,55 @@ def diretorio_teste(diretorio):
     for dir_file in diretorio.split('\t'):
         print dir_file
         os.system('head -n 1 {file}'.format(file=dir_file))
+
+def intersect_interaction_data(interaction_file, bed_file, bed_col=None):
+    ''' Given a tabular *interaction_file*, returns a chosen line or  coord in bed file  that interacts with one o both interaction file coords.
+    Parameters
+    ----------------------
+    interaction_file(file or array tab-sep):
+        File that follow the example (2 coordinates followed):
+
+        chr1    1   100 chr1    500 600 geneA   90  98  id .. .. ..
+    bed_file (bed_file):
+        Some bed file
+    bed_col (int):
+        When the intersect between bed and intersect file exists. Returns the bed line number given by *bed_col*.
+
+    Returns (array):
+
+        Vector containing the example out:
+         chr1   1   100 x,y,z chr1 5 500 a,b,c
+         chr2 1 200 a chr2 500 1000 z,x,r
+    '''
+    #Checking interaction_file type
+    if type(interaction_file) == str:
+         inter_file = abrir_arquivo(interaction_file, tabulador_interno='t')
+    elif type(interaction_file) == list:
+         inter_file = interaction_file
+    else:
+        sys.stderr('No recognize file Type' + '\n')
+        sys.exit(1)
+    inter_a = [i_a[0:3]+i_a[3:6]+i_a[6:-1] for i_a in inter_file]
+    inter_b = [i_b[3:6]+i_b[0:3]+i_a[6:-1]for i_b in inter_file]
+    #converting bed file to pybed object
+    bed_file_pybt_object = pybedtools.BedTool(bed_file)
+    #remove pybedtools temps
+    pybedtools.cleanup()
+    #Parsing table to bed
+    inter_a_bed = pybedtools.BedTool('\n'.join('\t'.join(parse_bed_a) for parse_bed_a in inter_a if not re.search('\D',parse_bed_a[1])), from_string=True)
+    inter_b_bed = pybedtools.BedTool('\n'.join('\t'.join(parse_bed_b) for parse_bed_b in inter_b if not re.search('\D',parse_bed_b[1])), from_string=True)
+    #Intersecting A and B interaction with bed file
+    result_bed_a_intersect = inter_a_bed.intersect(bed_file_pybt_object)
+    result_bed_b_intersect = inter_b_bed.intersect(bed_file_pybt_object)
+    print bed_file_pybt_object.intersect(inter_a_bed, wa=True, wb=True)
+    print '------------------------------------'
+    print bed_file_pybt_object.intersect(inter_b_bed, wa=True, wb= True)
+
+
+
+
+
+
 
 def fix_bed12_strand_error(gtf_table_format):
     '''Given a bed12 file, search for non compatible lines (end > start) and fix it
