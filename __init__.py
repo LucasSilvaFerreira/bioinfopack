@@ -364,7 +364,7 @@ def intersect_interaction_data(interaction_file, bed_file, bed_col=None):
     result_bed_a_intersect = inter_a_bed.intersect(bed_file_pybt_object)
     result_bed_b_intersect = inter_b_bed.intersect(bed_file_pybt_object)
     print bed_file_pybt_object.intersect(inter_a_bed, wa=True, wb=True)
-    print '------------------------------------'
+    print '-------------------------------------'
     print bed_file_pybt_object.intersect(inter_b_bed, wa=True, wb= True)
 
 
