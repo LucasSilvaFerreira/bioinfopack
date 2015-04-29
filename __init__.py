@@ -368,7 +368,25 @@ def intersect_interaction_data(interaction_file, bed_file, bed_col=None):
     print '-------------------------------------'
     print bed_file_pybt_object.intersect(inter_b_bed, wa=True, wb= True)
 
-
+def generate_bed_bins(bin_size, chr_name, start_chr, end_chr):
+    '''Given a bin size  creates a bed_string file
+    Parameters
+    -----------------
+    bin_size: int
+        Fragment the given chr in N *bin_size*
+    chr_name : str
+        chromossome name
+    start_chr : int
+        The initial bin coord
+    end_chr : int
+        The end bin coord (The last bin always will be lost).
+    Return
+    ---------------
+    One string whith bed file.
+    '''
+    bin_size, start_chr, end_chr = int(bin_size), int(start_chr), int(end_chr)
+    bed_list=  ['\t'.join([chr_name, str(range_coord), str((range_coord+bin_size)-1)]) for range_coord in range(start_chr, end_chr, bin_size)]
+    return '\n'.join(bed_list)
 
 def fix_bed6_strand_error(bed6_file_list):
     '''Given a bed6 file (3 line min size). Fix that lines which have stop  small than starts
