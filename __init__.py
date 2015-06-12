@@ -10,6 +10,7 @@ import re
 from glob import glob
 import thread, time
 import multiprocessing
+import subprocess
 from multiprocessing import Manager
 
 
@@ -322,6 +323,11 @@ def diretorio_teste(diretorio):
     for dir_file in diretorio.split('\t'):
         print dir_file
         os.system('head -n 1 {file}'.format(file=dir_file))
+
+def shellToString(string_comando):
+    '''retorna em forma de lista uma saida do comando do sistema invocado utilizando *string_comando* escolhido'''
+    return [saida_comando for saida_comando in subprocess.check_output(string_comando, shell=True, stderr=subprocess.STDOUT).split("\n")]
+
 
 def fix_bed12_strand_error(gtf_table_format):
     '''Given a bed12 file, search for non compatible lines (end > start) and fix it
