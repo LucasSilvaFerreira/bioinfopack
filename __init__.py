@@ -12,6 +12,7 @@ import thread, time
 import multiprocessing
 import subprocess
 from multiprocessing import Manager
+import pybedtools
 
 
 class thread_processador:
@@ -101,7 +102,7 @@ class thread_processador:
         print 'esse metodo deve ser sobrescrito com os parametros presentes nesse arquivo dentro da classe'
         for array_linha in self.arquivo_array[int(inicio):int(fim)]:
 
-            array_temporario.append(array_linha) # funcao que joga o resultado do seu processamento no array compartilhado entre os processadores
+            self.array_temporario.append(array_linha) # funcao que joga o resultado do seu processamento no array compartilhado entre os processadores
 
         self.saida_unica.append(self.array_temporario)
 
@@ -136,7 +137,7 @@ def paralel_task(n_process):
             try:
                 arquivo = iter(arquivo_escolhido)
             except TypeError, te:
-                print some_object, 'Entre com uma variavel de entrada iterble'
+                print te, 'Entre com uma variavel de entrada iterble'
                 print sys.exit()
             #guardando o arquivo em um array para que seja feita a divisao
             arquivo_array = [ arquivo_linha for arquivo_linha in arquivo if arquivo_linha ]
@@ -329,6 +330,89 @@ def shellToString(string_comando):
     return [saida_comando for saida_comando in subprocess.check_output(string_comando, shell=True, stderr=subprocess.STDOUT).split("\n")]
 
 
+def intersect_interaction_data(interaction_file, bed_file, bed_col=None):
+    ''' Given a tabular *interaction_file*, returns a chosen line or  coord in bed file  that interacts with one o both interaction file coords.
+    Parameters
+    ----------------------
+    interaction_file(file or array tab-sep):
+        File that follow the example (2 coordinates followed):
+
+        chr1    1   100 chr1    500 600 geneA   90  98  id .. .. ..
+    bed_file (bed_file):
+        Some bed file
+    bed_col (int):
+        When the intersect between bed and intersect file exists. Returns the bed line number given by *bed_col*.
+
+    Returns (array):
+
+        Vector containing the example out:
+         chr1   1   100 x,y,z chr1 5 500 a,b,c
+         chr2 1 200 a chr2 500 1000 z,x,r
+    '''
+    #Checking interaction_file type
+    sys.stderr.wirte("FUnção ainda não terminada " +"\n")
+    if type(interaction_file) == str:
+         inter_file = abrir_arquivo(interaction_file, tabulador_interno='t')
+    elif type(interaction_file) == list:
+         inter_file = interaction_file
+    else:
+        sys.stderr('No recognize file Type' + '\n')
+        sys.exit(1)
+    inter_a = [i_a[0:3]+i_a[3:6]+i_a[6:-1] for i_a in inter_file]
+    inter_b = [i_b[3:6]+i_b[0:3]+i_a[6:-1]for i_b in inter_file]
+    #converting bed file to pybed object
+    bed_file_pybt_object = pybedtools.BedTool(bed_file)
+    #remove pybedtools temps
+    pybedtools.cleanup()
+    #Parsing table to bed
+    inter_a_bed = pybedtools.BedTool('\n'.join('\t'.join(parse_bed_a) for parse_bed_a in inter_a if not re.search('\D',parse_bed_a[1])), from_string=True)
+    inter_b_bed = pybedtools.BedTool('\n'.join('\t'.join(parse_bed_b) for parse_bed_b in inter_b if not re.search('\D',parse_bed_b[1])), from_string=True)
+    #Intersecting A and B interaction with bed file
+    result_bed_a_intersect = inter_a_bed.intersect(bed_file_pybt_object)
+    result_bed_b_intersect = inter_b_bed.intersect(bed_file_pybt_object)
+    print bed_file_pybt_object.intersect(inter_a_bed, wa=True, wb=True)
+    print '-------------------------------------'
+    print bed_file_pybt_object.intersect(inter_b_bed, wa=True, wb= True)
+
+def generate_bed_bins(bin_size, chr_name, start_chr, end_chr):
+    '''Given a bin size  creates a bed_string file
+    Parameters
+    -----------------
+    bin_size: int
+        Fragment the given chr in N *bin_size*
+    chr_name : str
+        chromossome name
+    start_chr : int
+        The initial bin coord
+    end_chr : int
+        The end bin coord (The last bin always will be lost).
+    Return
+    ---------------
+    One string whith bed file.
+    '''
+    bin_size, start_chr, end_chr = int(bin_size), int(start_chr), int(end_chr)
+    bed_list=  ['\t'.join([chr_name, str(range_coord), str((range_coord+bin_size)-1)]) for range_coord in range(start_chr, end_chr, bin_size)]
+    return '\n'.join(bed_list)
+
+def fix_bed6_strand_error(bed6_file_list):
+    '''Given a bed6 file (3 line min size). Fix that lines which have stop  small than starts
+     Parameters
+     _____________
+     bed6_file_array (list_tab_sep)
+
+     Returns:
+     _____________
+     array that bed6 file was fixed
+     '''
+    out_return = []
+    for line in bed6_file_list:
+        if len(line) >=3:
+            if int(line[1]) < int(line[2]):
+                #Inverting data
+                line[1],line[2] = line[2],line[1]
+            out_return.append(line)
+
+
 def fix_bed12_strand_error(gtf_table_format):
     '''Given a bed12 file, search for non compatible lines (end > start) and fix it
     ex:
@@ -337,22 +421,29 @@ def fix_bed12_strand_error(gtf_table_format):
 
     '''
     return_table=[]
-    for line in gtf_table_format:
+    for n_line, line in enumerate(gtf_table_format):
         if line:
-            strand=  line.split('\t')[5]
-            start =  int(line.split('\t')[1])
-            stop =  int(line.split('\t')[2])
-            if stop > start :
+            if len(line) < 10:
+                sys.stderr.write( 'Line: {} has a incompatible bed12 size.\n'.format(str(n_line)))
+                pass
+            strand=  line[5]
+            start =  int(line[1])
+            stop =  int(line[2])
+            if stop < start :
                 #inverting coord
                 stop, start = start, stop
-                tabbed_line =  line.split('\t')
+                tabbed_line =  line
                 #fixing position
                 tabbed_line[1]=start
                 tabbed_line[2]=stop
                 tabbed_line[10] = tabbed_line[10].replace('-', '')
+                tabbed_line[1]=str(start)
+                tabbed_line[2]=str(stop)
+                tabbed_line[11] = tabbed_line[11].replace('-','')
                 return_table.append("\t".join(tabbed_line))
             else:
-                return_table.append(line)
+                line[11] = line[11].replace('-', '')
+                return_table.append("\t".join(line))
     return return_table
 
 def abrir_arquivo(nome_do_arquivo, delimitador='\n', tabulador_interno='none'):
@@ -461,6 +552,7 @@ def captura_linhas_com_um_valor_igual_em_diferentes_arquivos(arquivo_base, colun
     coluna_id_base = int(convertendo )
     base= abrir_arquivo(arquivo_base, tabulador_interno='t')
     target = abrir_arquivo(arquivo_target)
+    print 'carregado'
     if verse:
         if return_target:
             return [linha for id in base for linha in target if id[coluna_id_base] in linha]
@@ -472,6 +564,109 @@ def captura_linhas_com_um_valor_igual_em_diferentes_arquivos(arquivo_base, colun
                         for id in base for linha in target if id[coluna_id_base] in linha]
     else: # retorna as linhas que não foram encontradas
             return [linha for id in base for linha in target if id[coluna_id_base] not in linha]
+
+def getSameValues(arquivo_base, coluna_id_base, arquivo_target, coluna_id_target, verse= True
+                                                             , return_target=True, cap_linha_no_target=-1):
+    ''' Dado o *arquivo_base* e o *arquivo_target* procura o valor contido na *coluna_id_base* do *arquivo_base* em qualquer
+    campo das linhas do *arquivo_target*. Obs= Valores redundantes são considerados
+    Parametros
+    -------------
+        arquivo_base : string
+            Arquivo contendo uma coluna com ids que devem ser procurados no *arquivo_target*
+        arquivo_target : string
+            Arquivo onde o padrão contido na *coluna_id_base* do *arquivo_base* será buscado
+        coluna_id_base : int(0-based)
+            Coluna no *arquivo_base* em que o id será procurado no *arquivo_taget*. O id deve existir em ambos os
+            arquivos
+        coluna_id_target: int(0-based)
+            Coluna no *arquivo_target* em que o valor de *arquivo_base* será procurado
+        verse : bool
+            Se *verse* for igual a False, retorna apenas as linhas não encontradas (default= True)
+        return_target : Bool
+            True=Retorna na saida o arquivo target
+            False= Retorna na saida o arquivo base
+        cap_linha_no_target : int defaut (-1)
+            adiciona uma informação contida em uma colubna especifica do arquivo target ao final da impressão das
+            saidas query encontradas na busca. O valor int corresponde ao numero da coluna que será capturada,
+            sendo essa previamente separada por \tab.
+            obs: Linhas em que os valores podem ser redundantes serão retornados separados por ,
+    Return
+    -------------
+    Retorna um array com  as linhas do *arquivo_target* que possuem o id do *arquivo_base*
+    '''
+
+    sys.stderr.write("Sempre confira se as linhas com as chaves estão corretas! As hashs dependem disso :)" + "\n")
+    coluna_id_base = int(coluna_id_base)
+    coluna_id_target =  int(coluna_id_target)
+    base= abrir_arquivo(arquivo_base, tabulador_interno='t')
+    target = abrir_arquivo(arquivo_target, tabulador_interno='t')
+    target_hash = {}
+    for t_linha in target:
+        if len(t_linha) >= coluna_id_target:
+            if t_linha[coluna_id_target] in target_hash:
+                #sys.stderr.write("repetido" + "\n")
+                target_hash[t_linha[coluna_id_target]].append(t_linha)
+            else:
+                #sys.stderr.write("diferente" + "\n")
+                target_hash[t_linha[coluna_id_target]]=[]
+                target_hash[t_linha[coluna_id_target]].append(t_linha)
+    print 'carregado'
+    target ='zerada'
+    out_array_table=[]
+    if verse:
+        if not return_target:
+            for id in base:
+                if len(id)>= coluna_id_base and id[coluna_id_base] in target_hash:
+                    #acrescenta cada valor dentro do array de saida
+                    for valor in target_hash[id[coluna_id_base]]:
+                        out_array_table.append('\t'.join(valor))
+            #return [linha for id in base for linha in target if id[coluna_id_base] in linha[coluna_id_target]]
+
+        else: #retorna o arquivo base
+            sys.stderr.write("retorna arquivo target" + "\n")
+            if cap_linha_no_target == -1: # não retorna com a adição da ultima linha do target
+                sys.stderr.write("not capture line" + "\n")
+                for id in base:
+                    if len(id)>= coluna_id_base and id[coluna_id_base] in target_hash:
+                        #acrescenta cada valor dentro do array de saida
+                        out_array_table.append('\t'.join(id))
+
+
+                #return [id for id in base for linha in target if id[coluna_id_base] in linha[coluna_id_target]]
+
+
+            else: #retorna com a adicao da ultima linha sendo um valor determinado dentro do target
+                sys.stderr.write("Retorna linha com adicao" + "\n")
+                for id in base:
+                    #print id[coluna_id_base]
+                    if len(id)>= coluna_id_base and id[coluna_id_base] in target_hash:
+                        #acrescenta cada valor dentro do array de saida
+                        valores_colunas=[]
+                        for valor in target_hash[id[coluna_id_base]]:
+                            #print valor
+                            #print '|------>', id, coluna_id_base, id[coluna_id_base], target_hash[id[coluna_id_base]][cap_linha_no_target]
+                            valores_colunas.append(valor[cap_linha_no_target])
+                        #print valores_colunas
+                        id.append(','.join(valores_colunas))
+                        out_array_table.append(id)
+
+
+
+                #return [('\t'.join(id)+ '\t' + str(coluna_id_target[cap_linha_no_target]))
+                #        for id in base for linha in target if id[coluna_id_base] in linha[coluna_id_target]]
+
+
+    else: # retorna as linhas que não foram encontradas
+        hash_base = {id[coluna_id_base]:id for id in base if len(id) >= coluna_id_base }
+        base = 'zerada'
+        for chave_target in target_hash:
+            if chave_target not in hash_base:
+                for valor in target_hash[chave_target]:
+                    out_array_table.append('\t'.join(valor))
+
+            #return [linha for id in base for linha in target if id[coluna_id_base] not in linha[coluna_id_target]]
+
+    return out_array_table
 
 def retorna_somatoria_de_uma_coluna_especifica(arquivo, id_unico_para_fusao , id_da_coluna_somatoria, media=False):
     ''' Dado uma tabela com valores não únicos, mas com ID unicos em uma determinada coluna, Retorna a somatória
