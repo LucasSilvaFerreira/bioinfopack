@@ -8,7 +8,7 @@ import time
 import sys
 import re
 from glob import glob
-import thread,time
+import thread, time
 import multiprocessing
 from multiprocessing import Manager
 
@@ -343,7 +343,7 @@ def fix_bed12_strand_error(gtf_table_format):
                 #fixing position
                 tabbed_line[1]=start
                 tabbed_line[2]=stop
-                tabbed_line[10] = tabbed_line[10].replace('-','')
+                tabbed_line[10] = tabbed_line[10].replace('-', '')
                 return_table.append("\t".join(tabbed_line))
             else:
                 return_table.append(line)
