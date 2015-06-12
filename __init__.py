@@ -325,10 +325,9 @@ def diretorio_teste(diretorio):
         print dir_file
         os.system('head -n 1 {file}'.format(file=dir_file))
 
-def shellToString(string_comando):
+def shell_to_string(string_comando):
     '''retorna em forma de lista uma saida do comando do sistema invocado utilizando *string_comando* escolhido'''
     return [saida_comando for saida_comando in subprocess.check_output(string_comando, shell=True, stderr=subprocess.STDOUT).split("\n")]
-
 
 def intersect_interaction_data(interaction_file, bed_file, bed_col=None):
     ''' Given a tabular *interaction_file*, returns a chosen line or  coord in bed file  that interacts with one o both interaction file coords.
@@ -411,7 +410,6 @@ def fix_bed6_strand_error(bed6_file_list):
                 #Inverting data
                 line[1],line[2] = line[2],line[1]
             out_return.append(line)
-
 
 def fix_bed12_strand_error(gtf_table_format):
     '''Given a bed12 file, search for non compatible lines (end > start) and fix it
