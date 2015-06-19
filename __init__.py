@@ -4,6 +4,7 @@ __author__ = 'lucassilva'
 import numpy
 import os
 #import math
+
 import time
 import sys
 import re
@@ -13,7 +14,7 @@ import multiprocessing
 import subprocess
 from multiprocessing import Manager
 import pybedtools
-
+import functools
 
 class thread_processador:
     ''' Passe essa classe como herança para um script qualquer que deseja ser paralelizado. Nao se esquecendo de
@@ -327,11 +328,16 @@ def diretorio_teste(diretorio):
 
 
 
-def  sort_gtf(gtf_file):
-    '''Given a gtf file sort the content and print the result'''
-    gtf_array = abrir_arquivo(gtf_file, tabulador_interno='t' )
+def  sort_gtf(gtf_file, remove_chr=True):
+    '''Given a gtf file sort the content and return one array with the result
+    This function searchs for repeat lines(creating a set array)
+    '''
+    return_array_sorted_gtf =[]
+    gtf_array = abrir_arquivo(gtf_file)
     hash_chromossomes = {}
-    for crom in gtf_array:
+    #file->list->set->list->split(\t)
+    for crom in [gtf_line.split('\t') for gtf_line in list(set(gtf_array))]:
+        #print crom
         if crom[0] in hash_chromossomes:
             hash_chromossomes[crom[0]].append(crom)
         else:
@@ -340,7 +346,10 @@ def  sort_gtf(gtf_file):
 
     for k, value in hash_chromossomes.iteritems():
         for x in sorted(value, key=lambda x: int(x[3])):
-            print '\t'.join(x)
+            return_array_sorted_gtf.append('\t'.join(x))
+
+    return return_array_sorted_gtf
+
 
 
 def shell_to_string(string_comando):
