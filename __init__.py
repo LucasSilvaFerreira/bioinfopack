@@ -12,6 +12,97 @@ import thread,time
 import multiprocessing
 from multiprocessing import Manager
 import pybedtools
+import subprocess
+
+
+
+
+class Blast_query_parser:
+    def __init__(self, query_id,
+                       database_origin,
+                       query_size=0,
+                       sig_alings_list=None,
+                       hits=False):
+
+        self.query_id = query_id
+        #print self.query_id
+        self.query_size = query_size
+        self.database_origin = database_origin
+        self.sig_aling_list = sig_alings_list #file that will be transformed in  hash
+
+        if self.sig_aling_list is not None:
+         self.alings_hits_array_hashs = self.parse_alings(self.sig_aling_list)
+        #criar variavel hits
+         self.size = len(self.alings_hits_array_hashs)
+        else:
+            self.size=0
+        self.index=0
+    def parse_alings(self, sig_aling_list):
+        array_temp_return_parser_aling=[]
+
+        for aling_data in sig_aling_list:
+            busca = re.search('(\S*)\s*(\S*)\s*(\S*)',aling_data)
+            array_temp_return_parser_aling.append({'id':busca.group(1), 'score': busca.group(2), 'e_value':busca.group(3)})
+
+        return array_temp_return_parser_aling
+
+        #return array_temp_return_parse_aling
+        #recebe hits positivos. cehcar se o tamanho é maior que zero(hits =True)fazer uma HASH com o score, e-value, identidade, gaps, matchs
+        #fazer troço do print modificado
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        if self.index < self.size:
+            i= self.index
+            self.index += 1
+
+
+            return self.alings_hits_array_hashs[i]
+        else:
+            raise StopIteration()
+
+
+class Blast_parser:
+    def __init__(self, blast_in):
+        ''' receive a parse out file'''
+        self.i=0
+        self.blast_in = blast_in
+        #parsing file by 'Query= ' tag
+        self.Parser_open = abrir_arquivo(self.blast_in, delimitador='Query= ')[1:-1]
+        self.created_objects = self.create_objects(self.Parser_open)
+        self.size = len(self.created_objects)
+
+    def create_objects(self, array_parse_open):
+        array_query_return = []
+        for query in array_parse_open:
+            id = query.split('\n')[0]
+            print id
+            size = re.search(' +\((\d+) ', query.split('\n')[1].replace(',','')).group(1)
+            database = query.split('Database: ')[1].split('\n')[0]
+            try:
+                sig_alings = query.split('Sequences producing')[1].split('>')[0].split('\n')[2:-2]
+
+                created_object=Blast_query_parser(query_id= id, query_size= size, database_origin=database, hits=True, sig_alings_list=sig_alings)
+            except:
+                sys.stderr.write("sem hits" + "\n")
+                created_object=Blast_query_parser(query_id= id, query_size= size, database_origin=database, hits=False, sig_alings_list=None)
+
+            array_query_return.append(created_object)
+
+        return array_query_return
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        if self.i < self.size:
+            i= self.i
+            self.i += 1
+            return self.created_objects[i]
+        else:
+            raise StopIteration()
 
 
 class thread_processador:
@@ -324,6 +415,10 @@ def diretorio_teste(diretorio):
         print dir_file
         os.system('head -n 1 {file}'.format(file=dir_file))
 
+def shellToString(string_comando):
+    '''Retorna em forma de lista uma saida do comando do sistema invocado, utilizando a *string_comando* escolhido.'''
+    return  [saida_comando for saida_comando in subprocess.check_output(string_comando, shell = True, stderr = subprocess.STDOUT).split("\n")]
+
 def intersect_interaction_data(interaction_file, bed_file, bed_col=None):
     ''' Given a tabular *interaction_file*, returns a chosen line or  coord in bed file  that interacts with one o both interaction file coords.
     Parameters
@@ -368,7 +463,7 @@ def intersect_interaction_data(interaction_file, bed_file, bed_col=None):
     print '-------------------------------------'
     print bed_file_pybt_object.intersect(inter_b_bed, wa=True, wb= True)
 
-def generate_bed_bins(bin_size, chr_name, start_chr, end_chr):
+def generate_bed_bins(bin_size, chr_name, start_chr, end_chr, force_end=0):
     '''Given a bin size  creates a bed_string file
     Parameters
     -----------------
@@ -380,12 +475,20 @@ def generate_bed_bins(bin_size, chr_name, start_chr, end_chr):
         The initial bin coord
     end_chr : int
         The end bin coord (The last bin always will be lost).
+    force_end : int (defaut 0)
+        get the last bin and set a custom value.
     Return
     ---------------
     One string whith bed file.
     '''
     bin_size, start_chr, end_chr = int(bin_size), int(start_chr), int(end_chr)
     bed_list=  ['\t'.join([chr_name, str(range_coord), str((range_coord+bin_size)-1)]) for range_coord in range(start_chr, end_chr, bin_size)]
+
+    if force_end != 0:
+        #set a custom end coord in last bed_list value
+        editing_last = bed_list[-1].split('\t')
+        editing_last[2] = str(force_end)
+        bed_list[-1] = '\t'.join(editing_last)
     return '\n'.join(bed_list)
 
 def fix_bed6_strand_error(bed6_file_list):
@@ -405,7 +508,6 @@ def fix_bed6_strand_error(bed6_file_list):
                 #Inverting data
                 line[1],line[2] = line[2],line[1]
             out_return.append(line)
-
 
 def fix_bed12_strand_error(gtf_table_format):
     '''Given a bed12 file, search for non compatible lines (end > start) and fix it
@@ -508,7 +610,7 @@ def funde_valores_duas_tabelas(tabela_query, tabela_target):
 
     '''
     if len(tabela_query[0]) > 1:
-        return [ alvo+'\t'+'\t'.join(query) for query in tabela_query for alvo in tabela_target if query[0] in  alvo]
+        return [ alvo+'\t'+'\t'.join(map(str, query)) for query in tabela_query for alvo in tabela_target if query[0] in  alvo]
     else:
         return [ alvo+'\t'+query for query in tabela_query for alvo in tabela_target if query in  alvo]
 
@@ -589,8 +691,18 @@ def getSameValues(arquivo_base, coluna_id_base, arquivo_target, coluna_id_target
     sys.stderr.write("Sempre confira se as linhas com as chaves estão corretas! As hashs dependem disso :)" + "\n")
     coluna_id_base = int(coluna_id_base)
     coluna_id_target =  int(coluna_id_target)
-    base= abrir_arquivo(arquivo_base, tabulador_interno='t')
-    target = abrir_arquivo(arquivo_target, tabulador_interno='t')
+    #checando se os arquivos são listas ou enderecos de arquivos
+    if type(arquivo_base)== list:
+        base = arquivo_base
+    else:
+        base= abrir_arquivo(arquivo_base, tabulador_interno='t')
+
+    if type(arquivo_target) ==list:
+        target = arquivo_target
+    else:
+        target = abrir_arquivo(arquivo_target, tabulador_interno='t')
+
+
     target_hash = {}
     for t_linha in target:
         if len(t_linha) >= coluna_id_target:
@@ -601,7 +713,7 @@ def getSameValues(arquivo_base, coluna_id_base, arquivo_target, coluna_id_target
                 #sys.stderr.write("diferente" + "\n")
                 target_hash[t_linha[coluna_id_target]]=[]
                 target_hash[t_linha[coluna_id_target]].append(t_linha)
-    print 'carregado'
+    #print 'carregado'
     target ='zerada'
     out_array_table=[]
     if verse:
@@ -645,9 +757,8 @@ def getSameValues(arquivo_base, coluna_id_base, arquivo_target, coluna_id_target
 
                 #return [('\t'.join(id)+ '\t' + str(coluna_id_target[cap_linha_no_target]))
                 #        for id in base for linha in target if id[coluna_id_base] in linha[coluna_id_target]]
-
-
     else: # retorna as linhas que não foram encontradas
+        sys.stderr.write('Returning the diference between files'+ '\n')
         hash_base = {id[coluna_id_base]:id for id in base if len(id) >= coluna_id_base }
         base = 'zerada'
         for chave_target in target_hash:
@@ -694,9 +805,11 @@ def retorna_somatoria_de_uma_coluna_especifica(arquivo, id_unico_para_fusao , id
                 hash_tabela[linha[id_unico_para_fusao]]=[]
                 hash_tabela[linha[id_unico_para_fusao]].append(float(linha[id_da_coluna_somatoria]))
     if media==False:
-        return sorted([[x, hash_tabela[x]] for x in hash_tabela], key=lambda valor: valor[1],reverse=True)
+        return sorted([[x, hash_tabela[x]] for x in hash_tabela], key=lambda valor: valor[1], reverse=True)
     else:
-        return sorted([[x, numpy.mean(hash_tabela[x])] for x in hash_tabela], key=lambda valor: valor[1],reverse=True)
+        for x in hash_tabela:
+            #print numpy.mean(hash_tabela[x])
+            return sorted([[x, numpy.mean(hash_tabela[x])] for x in hash_tabela], key=lambda valor: valor[1], reverse=True)
 
 def all_dir_wigfix_to_bigwig(diretorio, chrom_sizes_file):
     """ Converte todos os arquivos(wigfix) em um determinado diretorio para o formato bigwig
@@ -748,9 +861,14 @@ def ngsutils_all_dir_count(diretorio, gtf):
     gtf : string
         Caminho completo para o arquivo gtf
     '''
-
+    if not re.search('/$', 'diretorio'):
+        diretorio += '/'
+    else:
+        pass
     diretorio_bai =  glob('{}*.bai'.format(diretorio))
     diretorio_bam =  glob('{}*.bam'.format(diretorio))
+
+
 
     for contador,bam in enumerate(diretorio_bam):
         #testando existencia dos arquivos index .bai
@@ -822,6 +940,21 @@ def bed_start_site_to_tss(bed_string, down = 1000, up = 1000, not_reverse= True)
             return saida_str
     else:
         sys.stderr.write('valor proximo da borda do cromossomo: '+ saida_splitada[1]+'\n')
+
+def bed_get_midle_point(bed_string):
+    '''Given a *bed_string* respecting the 5' -> 3' coordinates
+    returns a relative midpoint.
+    Parameters:
+    -------------------
+    bed_string : str
+        bed_string separated  by tab
+
+    -------------------
+    string with mid point'''
+    bed_string = bed_string.split('\t')
+    midpoint = ((int(bed_string[2])-int(bed_string[1]))/2)
+    return str(int(bed_string[1]) + midpoint)
+
 
 def main():
     '''Projeto no github..tentando atualizar'''
