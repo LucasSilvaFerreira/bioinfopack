@@ -8,13 +8,22 @@ import time
 import sys
 import re
 from glob import glob
-import thread,time
+import thread, time
 import multiprocessing
 from multiprocessing import Manager
 import pybedtools
 import subprocess
-
+import os.path
 #git modification
+class AppNotFound(Exception):
+    def __init__(self, file_name):
+        sys.stderr.write('\nApp: {} not found\n'.format(file_name))
+        sys.exit()
+
+class DirNotFound(Exception):
+    sys.exit(0)
+
+class ExperimentDesignError(Exception): pass
 
 
 class Blast_query_parser:
@@ -832,6 +841,109 @@ def all_dir_wigfix_to_bigwig(diretorio, chrom_sizes_file):
                                                             saida="{}.bw".format(arquivo.split('/').pop().rsplit('.',1)[0]))
                                                             )
 
+
+def check_program_exists(app_name):
+    '''Given a app name, check if this app exists and returns the app location.
+    parameter:
+        app_name : string
+    return: string
+        String which location of this app
+    exception: AppNotFound
+        Raises exception and close the program.
+    '''
+
+    path_app_dir = shellToString("which {app}".format(app_name))
+    if len(path_app_dir[0]) > 0:
+        return path_app_dir[0]
+
+    else:
+        raise AppNotFound(app_name)
+
+def check_path_exists(path_name):
+    if os.path.isfile(path_name):
+        return True
+    else:
+        return False
+
+
+
+
+def all_dir_trimmomatic(diretorio, paired_end=True, threads=5, trimm_path=None):
+    """ Converte todos os arquivos(wigfix) em um determinado diretorio para o formato bigwig
+    Parametros
+    ----------
+    diretorio : string
+        Diretorio contendo os arquivos wigfix ex: /home/arquivos/
+    paired_end : bool (default: true)
+        The reads are paired-end?
+
+    """
+
+    arquivos= glob('{}*.gz'.format(diretorio))
+    print arquivos
+
+    if paired_end:
+        pairs = [];
+        for file in arquivos:
+            for pair in arquivos:
+                if file != pair:
+                    if file.split('_R1')[0] == pair.split('_R2')[0]:
+                        pairs.append([file, pair])
+
+        if len(pairs) == (len(arquivos)/2):
+            pass  # If all pairs are matched...
+        else:
+            pairs_to_locate = '\t'.join(['\t'.join(x_pairs for x_pairs in pairs)])
+            files_not_found_str= '\n'.join([file_not_fount for file_not_fount in arquivos if file_not_fount not in pairs])
+
+            raise ExperimentDesignError('There some files without pairs!'
+                                        ' Remove from directory this files or check inconsistencies in their names'
+                                        ' z\n {}'.format(files_not_found_str))
+            sys.exit(0)
+
+    else:
+        print 'como proceder quando não existe pares?'
+
+    if not trimm_path:
+        trimm_path = check_program_exists('trimmomatic-0.30.jar')
+    else:
+        if check_path_exists(trimm_path):
+            pass
+        else:
+            raise AppNotFound(trimm_path)
+
+    for r1, r2 in pairs:
+
+        command = 'java -jar {trimm_path}' \
+        ' PE -phred33' \
+        ' -threads {threads}' \
+        ' M3_R1-sem-bug.fastq' \
+        ' M3_R2-sem-bug.fastq' \
+        ' M3_R1-sembug.paired.fq.gz' \
+        ' M3_R1-sembug.unpaired.fq.gz' \
+        ' M3_R2-sembug.paired.fq.gz' \
+        ' M3_R2-sembug.unpaired.fq.gz' \
+        ' ILLUMINACLIP:TruSeq3-PE.fa:2:30:10' \
+        ' LEADING:3' \
+        ' TRAILING:3' \
+        ' SLIDINGWINDOW:4:15' \
+        ' MINLEN:16 &'.format(trimm_path=trimm_path, threads=threads,  )
+
+
+
+
+    #
+    # for arquivo in arquivos:
+    #     print 'Trimming... {}...'.format(arquivo)
+    #     os.system('wigToBigWig {arquivo_x} {chrom_sizes_file} {saida}'.format(arquivo_x=arquivo,
+    #                                                         chrom_sizes_file=chrom_sizes_file,
+    #                                                         saida="{}.bw".format(arquivo.split('/').pop().rsplit('.',1)[0]))
+    #                                                         )
+    #
+    #
+
+
+
 def string_window_generator(string_in, window):
     '''Retorna um generator dado uma string e um intervalo desejado
 
@@ -954,6 +1066,37 @@ def bed_get_midle_point(bed_string):
     bed_string = bed_string.split('\t')
     midpoint = ((int(bed_string[2])-int(bed_string[1]))/2)
     return str(int(bed_string[1]) + midpoint)
+
+def get_groups(array_files):
+    '''pattern: 10_S2_L001_R1_001.fastq.gz
+        group comfirmation: 10_S2_R1
+        EX:
+        10_S2_L001_R1_001.fastq.gz
+        10_S2_L002_R1_001.fastq.gz
+        10_S2_L003_R1_001.fastq.gz
+
+    '''
+
+    out_files = []
+    hash_temp = {}
+    for file_x in array_files:
+        split_filename = file_x.split('_')
+        prefix = '{}_{}_{}'.format(split_filename[0], split_filename[1], split_filename[3])
+        if not prefix in hash_temp:
+            hash_temp['prefix'] = []
+            hash_temp['prefix'].append(file_x)
+        else:
+            hash_temp['prefix'].append(file_x)
+    for key, value in hash_temp.iteritems():
+        print key+" : ", value
+
+
+def fusion_rnaseq_samples(dir):
+    if check_path_exists(dir):
+        arquivos = glob('{}*.fastq.gz'.format(dir))
+
+    else:
+        raise DirNotFound("\n{} not found...".format(dir))
 
 
 def main():
