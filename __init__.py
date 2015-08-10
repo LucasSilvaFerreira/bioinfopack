@@ -14,14 +14,15 @@ from multiprocessing import Manager
 import pybedtools
 import subprocess
 import os.path
-#git modification
+
 class AppNotFound(Exception):
     def __init__(self, file_name):
-        sys.stderr.write('\nApp: {} not found\n'.format(file_name))
+        sys.stderr.write('\nApp: {} NOT FOUND\n'
+                         'Try to install, fix or use a path APP parameter!'.format(file_name))
         sys.exit()
 
-class DirNotFound(Exception):
-    sys.exit(0)
+class DirNotFound(Exception):pass
+
 
 class ExperimentDesignError(Exception): pass
 
@@ -851,12 +852,11 @@ def check_program_exists(app_name):
     exception: AppNotFound
         Raises exception and close the program.
     '''
-
-    path_app_dir = shellToString("which {app}".format(app_name))
-    if len(path_app_dir[0]) > 0:
-        return path_app_dir[0]
-
-    else:
+    try:
+        path_app_dir = shellToString("which {}".format(app_name))
+        if len(path_app_dir[0]) > 0:
+            return path_app_dir[0]
+    except:
         raise AppNotFound(app_name)
 
 def check_path_exists(path_name):
@@ -867,21 +867,158 @@ def check_path_exists(path_name):
 
 
 
+def top_hat_function(diretorio, paired_end=True, threads=5, trimm_path=None, adapters=None):
 
-def all_dir_trimmomatic(diretorio, paired_end=True, threads=5, trimm_path=None):
-    """ Converte todos os arquivos(wigfix) em um determinado diretorio para o formato bigwig
-    Parametros
+
+    '''
+    tophat -p 12
+    -o./teste_tofa_etoh_m3
+    -r 150
+    --mate-std-dev 150
+    --library-type fr-secondstrand
+    --b2-sensitive
+    -G /media/misc/work/androgeno/lncap-rnaseq-longo/gencodev17/tools/sem_chr_sorted_final_merge_gtfs_tabifix_sem_enter_duplo_hg19_mais_mirtranscripts.gtf
+    ../hg19-genoma/Bowtie2Index/genome
+    ../etoh/etoh-m3/filtered/M3_R1-sembug.paired.fq.gz
+    ../etoh/etoh-m3/filtered/M3_R2-sembug.paired.fq.gz
+    '''
+
+
+
+    # """ Given a directory and files ""*fast.gz" Do a trimmomatic filter using that files
+    #     Parametros
+    # ----------
+    # diretorio : string
+    #     Dir with  fastq.gz files ex: /home/arquivos/
+    # paired_end : bool (default: true)
+    #     The reads are paired-end?
+    # threads : int (default : 5)
+    #     Number of threads used to do a trimm
+    # trimm_path: string (defaut: None )
+    #     pass the path to trimmomatic. If none check for trimmomatic system path
+    # adapters : string
+    #     Path for adapters in fasta file
+    #
+    # """
+    # if adapters:
+    #     if os.path.isfile(adapters):
+    #         pass
+    #     else:
+    #         raise IOError("\n{} NOT FOUND".forma(adapters))
+    #         sys.exit(0)
+    # else:
+    #     raise IOError("You need enter with adapter file....")
+    #     sys.exit()
+    #
+    #
+    # arquivos= glob('{}*.fastq.gz'.format(diretorio))
+    #
+    # if paired_end:
+    #     pairs = [];
+    #     for file in arquivos:
+    #         for pair in arquivos:
+    #             if file != pair:
+    #                 if file.split('_R1')[0] == pair.split('_R2')[0]:
+    #                     pairs.append([file, pair])
+    #
+    #     size_pairs = 0
+    #
+    #
+    #
+    #     if len(pairs) == (len(arquivos)/2):
+    #         pass  # If all pairs are matched...
+    #     else:
+    #         pairs_to_locate = '\t'.join(['\t'.join(x_pairs) for x_pairs in pairs]).split('\t')
+    #
+    #         files_error = []
+    #         for x in arquivos:
+    #             if x not in pairs_to_locate:
+    #                 files_error.append(x)
+    #             else:
+    #                 pass
+    #
+    #         files_not_found_str = '\n'.join(files_error)
+    #
+    #         raise ExperimentDesignError('\nThere some files without pairs!'
+    #                                     ' \nRemove from directory this files or check inconsistencies in their names'
+    #                                     ' \n{}'.format(files_not_found_str))
+    #         sys.exit(0)
+    #
+    # else:
+    #     print 'como proceder quando não existe pares?'
+    #
+    # if not trimm_path:
+    #     trimm_path = check_program_exists('trimmomatic-0.30.jar')
+    # else:
+    #     if check_path_exists(trimm_path):
+    #         pass
+    #     else:
+    #         raise AppNotFound(trimm_path)
+    #
+    #
+    # count=1
+    # for r1, r2 in pairs:
+    #     print "Processing : {}/{}".format(count, len(pairs))
+    #     files_to_trimm = '{r1} {r2} {r1_paired} {r1_unpaired} {r2_paired} {r2_unpaired}'.format(r1=r1,
+    #                                                                            r2=r2,
+    #                                                                            r1_paired=r1.split('.')[0]+"_paired.fq.gz",
+    #                                                                            r1_unpaired=r1.split('.')[0]+"_unpaired.fq.gz",
+    #                                                                            r2_paired=r2.split('.')[0]+"_paired.fq.gz",
+    #                                                                            r2_unpaired=r2.split('.')[0]+"_unpaired.fq.gz"
+    #                                                                            )
+    #
+    #
+    #     command = 'java -jar {trimm_path}' \
+    #     ' PE -phred33' \
+    #     ' -threads {threads}' \
+    #     ' {files_to_trimm}' \
+    #     ' ILLUMINACLIP:{adapter}:2:30:10' \
+    #     ' LEADING:3' \
+    #     ' TRAILING:3' \
+    #     ' SLIDINGWINDOW:4:15' \
+    #     ' MINLEN:16'.format(trimm_path=trimm_path,
+    #                           threads=threads,
+    #                           files_to_trimm=files_to_trimm,
+    #                           adapter=adapters)
+    #
+    #     os.system(command)
+    #
+    #
+    #     count +=1
+
+
+
+
+def all_dir_trimmomatic(diretorio, paired_end=True, threads=5, trimm_path=None, adapters=None):
+    """ Given a directory and files ""*fast.gz" Do a trimmomatic filter using that files
+        Parametros
     ----------
     diretorio : string
-        Diretorio contendo os arquivos wigfix ex: /home/arquivos/
+        Dir with  fastq.gz files ex: /home/arquivos/
     paired_end : bool (default: true)
         The reads are paired-end?
+    threads : int (default : 5)
+        Number of threads used to do a trimm
+    trimm_path: string (defaut: None )
+        pass the path to trimmomatic. If none check for trimmomatic system path
+    adapters : string
+        Path for adapters in fasta file
 
     """
+    if adapters:
+        if os.path.isfile(adapters):
+            pass
+        else:
+            raise IOError("\n{} NOT FOUND".forma(adapters))
+            sys.exit(0)
+    else:
+        raise IOError("You need enter with adapter file....")
+        sys.exit()
 
-    arquivos= glob('{}*.gz'.format(diretorio))
-    print arquivos
 
+    arquivos= glob('{}*.fastq.gz'.format(diretorio))
+    #print arquivos
+    #print arquivos
     if paired_end:
         pairs = [];
         for file in arquivos:
@@ -889,16 +1026,28 @@ def all_dir_trimmomatic(diretorio, paired_end=True, threads=5, trimm_path=None):
                 if file != pair:
                     if file.split('_R1')[0] == pair.split('_R2')[0]:
                         pairs.append([file, pair])
+        #print pairs
+        size_pairs = 0
+        #print len(pairs), len(arquivos)
+
 
         if len(pairs) == (len(arquivos)/2):
             pass  # If all pairs are matched...
         else:
-            pairs_to_locate = '\t'.join(['\t'.join(x_pairs for x_pairs in pairs)])
-            files_not_found_str= '\n'.join([file_not_fount for file_not_fount in arquivos if file_not_fount not in pairs])
+            pairs_to_locate = '\t'.join(['\t'.join(x_pairs) for x_pairs in pairs]).split('\t')
+            #print pairs_to_locate
+            files_error = []
+            for x in arquivos:
+                if x not in pairs_to_locate:
+                    files_error.append(x)
+                else:
+                    pass
 
-            raise ExperimentDesignError('There some files without pairs!'
-                                        ' Remove from directory this files or check inconsistencies in their names'
-                                        ' z\n {}'.format(files_not_found_str))
+            files_not_found_str = '\n'.join(files_error)
+
+            raise ExperimentDesignError('\nThere some files without pairs!'
+                                        ' \nRemove from directory this files or check inconsistencies in their names'
+                                        ' \n{}'.format(files_not_found_str))
             sys.exit(0)
 
     else:
@@ -912,35 +1061,36 @@ def all_dir_trimmomatic(diretorio, paired_end=True, threads=5, trimm_path=None):
         else:
             raise AppNotFound(trimm_path)
 
+
+    count=1
     for r1, r2 in pairs:
+        print "Processing : {}/{}".format(count, len(pairs))
+        files_to_trimm = '{r1} {r2} {r1_paired} {r1_unpaired} {r2_paired} {r2_unpaired}'.format(r1=r1,
+                                                                               r2=r2,
+                                                                               r1_paired=r1.split('.')[0]+"_paired.fq.gz",
+                                                                               r1_unpaired=r1.split('.')[0]+"_unpaired.fq.gz",
+                                                                               r2_paired=r2.split('.')[0]+"_paired.fq.gz",
+                                                                               r2_unpaired=r2.split('.')[0]+"_unpaired.fq.gz"
+                                                                               )
+
 
         command = 'java -jar {trimm_path}' \
         ' PE -phred33' \
         ' -threads {threads}' \
-        ' M3_R1-sem-bug.fastq' \
-        ' M3_R2-sem-bug.fastq' \
-        ' M3_R1-sembug.paired.fq.gz' \
-        ' M3_R1-sembug.unpaired.fq.gz' \
-        ' M3_R2-sembug.paired.fq.gz' \
-        ' M3_R2-sembug.unpaired.fq.gz' \
-        ' ILLUMINACLIP:TruSeq3-PE.fa:2:30:10' \
+        ' {files_to_trimm}' \
+        ' ILLUMINACLIP:{adapter}:2:30:10' \
         ' LEADING:3' \
         ' TRAILING:3' \
         ' SLIDINGWINDOW:4:15' \
-        ' MINLEN:16 &'.format(trimm_path=trimm_path, threads=threads,  )
+        ' MINLEN:16'.format(trimm_path=trimm_path,
+                              threads=threads,
+                              files_to_trimm=files_to_trimm,
+                              adapter=adapters)
 
+        os.system(command)
 
-
-
-    #
-    # for arquivo in arquivos:
-    #     print 'Trimming... {}...'.format(arquivo)
-    #     os.system('wigToBigWig {arquivo_x} {chrom_sizes_file} {saida}'.format(arquivo_x=arquivo,
-    #                                                         chrom_sizes_file=chrom_sizes_file,
-    #                                                         saida="{}.bw".format(arquivo.split('/').pop().rsplit('.',1)[0]))
-    #                                                         )
-    #
-    #
+        #print command
+        count +=1
 
 
 
@@ -1028,8 +1178,8 @@ def bed_start_site_to_tss(bed_string, down = 1000, up = 1000, not_reverse= True)
         #print (n_start)-(n_end)
         saida_str = '\t'.join(bed_string_tabulada)
     else:
-        bed_string_tabulada =  bed_string.split('\t')
         ref_coord = int(bed_string_tabulada[1])
+        bed_string_tabulada =  bed_string.split('\t')
         n_start= ref_coord - down
         n_end= ref_coord + up
         bed_string_tabulada[1]= str(n_start)
@@ -1083,25 +1233,28 @@ def get_groups(array_files):
         split_filename = file_x.split('_')
         prefix = '{}_{}_{}'.format(split_filename[0], split_filename[1], split_filename[3])
         if not prefix in hash_temp:
-            hash_temp['prefix'] = []
-            hash_temp['prefix'].append(file_x)
+            hash_temp[prefix] = []
+            hash_temp[prefix].append(file_x)
         else:
-            hash_temp['prefix'].append(file_x)
-    for key, value in hash_temp.iteritems():
-        print key+" : ", value
+            hash_temp[prefix].append(file_x)
 
+    for key, value in hash_temp.iteritems():
+        print 'zcat {} >'.format(' '.join(value))
 
 def fusion_rnaseq_samples(dir):
-    if check_path_exists(dir):
-        arquivos = glob('{}*.fastq.gz'.format(dir))
-
+    if dir[-1]=='/':
+        pass
     else:
-        raise DirNotFound("\n{} not found...".format(dir))
+        dir += '/'
 
+    if os.path.isdir(dir):
+        arquivos_glob = glob('{}*.fastq.gz'.format(dir))
+        get_groups(arquivos_glob)
+    else:
+        raise DirNotFound("\n{} NOT found...".format(dir))
 
 def main():
     '''Projeto no github..tentando atualizar'''
-
 
 if __name__ == '__main__':
     sys.exit(main())
