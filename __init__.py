@@ -18,10 +18,23 @@ import os.path
 class AppNotFound(Exception):
     def __init__(self, file_name):
         sys.stderr.write('\nApp: {} NOT FOUND\n'
-                         'Try to install, fix or use a path APP parameter!'.format(file_name))
+                         'Try to install, fix or use a path APP parameter!\n'.format(file_name))
         sys.exit()
 
-class DirNotFound(Exception):pass
+class DirNotFound(Exception):
+    def __init__(self, dir_name):
+        sys.stderr.write('\nDIR: {} NOT FOUND\n'
+                         'Check your dir name!\n'.format(dir_name))
+        sys.exit()
+
+class FileNotFound(Exception):
+     def __init__(self, file_name):
+        sys.stderr.write('\nFile: {} NOT FOUND\n'
+                         'Check your path name!\n'.format(file_name))
+        sys.exit()
+
+
+
 
 
 class ExperimentDesignError(Exception): pass
@@ -51,7 +64,7 @@ class Blast_query_parser:
         array_temp_return_parser_aling=[]
 
         for aling_data in sig_aling_list:
-            busca = re.search('(\S*)\s*(\S*)\s*(\S*)',aling_data)
+            busca = re.search('(\S*)\s*(\S*)\s*(\S*)', aling_data)
             array_temp_return_parser_aling.append({'id':busca.group(1), 'score': busca.group(2), 'e_value':busca.group(3)})
 
         return array_temp_return_parser_aling
@@ -572,7 +585,7 @@ def abrir_arquivo(nome_do_arquivo, delimitador='\n', tabulador_interno='none'):
         return [linha.split(';') for linha in open(nome_do_arquivo, 'r').read().split(delimitador)if linha]
     elif tabulador_interno == ':':
         return [linha.split(':') for linha in open(nome_do_arquivo, 'r').read().split(delimitador) if linha]
-    elif tabulador_interno == ':':
+    elif tabulador_interno == 'n':
         return [linha.split('\n') for linha in open(nome_do_arquivo, 'r').read().split(delimitador) if linha]
     else:
         sys.stderr.write('Erro:\nEntre com um delimitador de linhas aceitavel: \n      t (tab) \n      s(espaço) \n'
@@ -867,39 +880,58 @@ def check_path_exists(path_name):
 
 
 
-def top_hat_function(diretorio, paired_end=True, threads=5, trimm_path=None, adapters=None):
+def task_check_app_path(path_app, commum_name):
+    '''Given a app_path check if is a valid link.
+     Parameter
+     ---------
+     path_app : string
+        Path for a valid app file
+     commun_name : string
+        A string with the name app to try use case the paths is unknow.
+     Returns
+     ---------
+     returns a path_app name or raise a error case these paht not is founded
+     '''
+    if not path_app:
+        path_app = check_program_exists(commum_name)
+    else:
+        if check_path_exists(path_app):
+            pass
+        else:
+            raise AppNotFound(path_app)
+    return path_app
+
+
+
+
+def top_hat_function(diretorio, paired_end=True, threads=5, tophat_path=None, adapters=None):
 
 
     '''
-    tophat -p 12
-    -o./teste_tofa_etoh_m3
-    -r 150
-    --mate-std-dev 150
-    --library-type fr-secondstrand
-    --b2-sensitive
-    -G /media/misc/work/androgeno/lncap-rnaseq-longo/gencodev17/tools/sem_chr_sorted_final_merge_gtfs_tabifix_sem_enter_duplo_hg19_mais_mirtranscripts.gtf
-    ../hg19-genoma/Bowtie2Index/genome
-    ../etoh/etoh-m3/filtered/M3_R1-sembug.paired.fq.gz
-    ../etoh/etoh-m3/filtered/M3_R2-sembug.paired.fq.gz
+    tophat -p {threads} -o {saida_dir} -r 150 --mate-std-dev 150 --library-type fr-secondstrand --b2-sensitive -G {gtf} {index_genome} {r1} {r2}
     '''
 
 
 
-    # """ Given a directory and files ""*fast.gz" Do a trimmomatic filter using that files
-    #     Parametros
-    # ----------
-    # diretorio : string
-    #     Dir with  fastq.gz files ex: /home/arquivos/
-    # paired_end : bool (default: true)
-    #     The reads are paired-end?
-    # threads : int (default : 5)
-    #     Number of threads used to do a trimm
-    # trimm_path: string (defaut: None )
-    #     pass the path to trimmomatic. If none check for trimmomatic system path
-    # adapters : string
-    #     Path for adapters in fasta file
-    #
-    # """
+    """ Given a directory and files ""*fast.gz" Do a trimmomatic filter using that files
+        Parametros
+    ----------
+    diretorio : string
+        Dir with  fastq.gz files ex: /home/arquivos/
+    paired_end : bool (default: true)
+        The reads are paired-end?
+    threads : int (default : 5)
+        Number of threads used to do a trimm
+    trimm_path: string (defaut: None )
+        pass the path to trimmomatic. If none check for trimmomatic system path
+    adapters : string
+        Path for adapters in fasta file
+
+    """
+
+
+
+
     # if adapters:
     #     if os.path.isfile(adapters):
     #         pass
@@ -947,13 +979,7 @@ def top_hat_function(diretorio, paired_end=True, threads=5, trimm_path=None, ada
     # else:
     #     print 'como proceder quando não existe pares?'
     #
-    # if not trimm_path:
-    #     trimm_path = check_program_exists('trimmomatic-0.30.jar')
-    # else:
-    #     if check_path_exists(trimm_path):
-    #         pass
-    #     else:
-    #         raise AppNotFound(trimm_path)
+
     #
     #
     # count=1
@@ -1178,7 +1204,7 @@ def bed_start_site_to_tss(bed_string, down = 1000, up = 1000, not_reverse= True)
         #print (n_start)-(n_end)
         saida_str = '\t'.join(bed_string_tabulada)
     else:
-        ref_coord = int(bed_string_tabulada[1])
+        ref_coord = int(bed_string[1])
         bed_string_tabulada =  bed_string.split('\t')
         n_start= ref_coord - down
         n_end= ref_coord + up
