@@ -6,7 +6,7 @@ from bioinfopack import abrir_arquivo, DirNotFound, check_program_exists, check_
 import re
 import logging
 import datetime
-from multiprocessing import pool
+from multiprocessing import Pool
 
 
 def to_bool(value):
@@ -148,26 +148,27 @@ class Tool:
             logging.debug('\n<<{}>> Finished : {}'.format(self.tool_name, finished_time))
 
     def task_run_cmd(self):
-        if self.multi_task ==1:
+        if self.multi_task == 1:
             #print self.task
             task_array = self.task
             for task_x in task_array:
                 self.execute_SYSTEM_command_task(task_x)
         if self.multi_task > 1 :
-            print 'check if yours resources can run this in parallel jobs'
+            print 'Check if yours resources can run this in parallel jobs'
             self.task_run_pooL_cmd()
 
 
 
     def task_run_pooL_cmd(self):
-        task_multi = pool(self.multi_task)
-        task_multi.map(self.execute_SYSTEM_command_task, self.task)
+        task_multi = Pool(self.multi_task)
+        #for x in self.task:
+        #    print x , 'task_teste'
+        task_multi.map(os.system, self.task)
 
 
 
 class TopHat(Tool):
     def __init__(self, config, tool_name='tophat', multi_task=1):
-
 
         Tool.__init__(self, tool_name=tool_name, config=config, multi_task=multi_task)
 
