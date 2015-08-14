@@ -6,7 +6,18 @@ from bioinfopack import abrir_arquivo, DirNotFound, check_program_exists, check_
 import re
 import logging
 import datetime
+from multiprocessing import pool
 
+
+def to_bool(value):
+    """
+       Converts 'something' to boolean. Raises exception for invalid formats
+           Possible True  values: 1, True, "1", "TRue", "yes", "y", "t"
+           Possible False values: 0, False, None, [], {}, "", "0", "faLse", "no", "n", "f", 0.0, ...
+    """
+    if str(value).lower() in ("yes", "y", "true",  "t", "1"): return True
+    if str(value).lower() in ("no",  "n", "false", "f", "0", "0.0", "", "none", "[]", "{}"): return False
+    raise Exception('Invalid value for boolean conversion: ' + str(value))
 
 
 def task_check_app_path(path_app, commum_name):
@@ -23,8 +34,6 @@ def task_check_app_path(path_app, commum_name):
      '''
 
     if not path_app:
-
-        print 'sem path'
         path_app = check_program_exists(commum_name)
     else:
         if check_path_exists(path_app):
@@ -51,14 +60,16 @@ def task_check_dir_path(dir_path):
 
 
 class Tool:
-    def __init__(self, tool_name, config):
+    def __init__(self, tool_name, config, multi_task):
+        self.multi_task = multi_task
         self.config = config
         self.tool_name = tool_name
         self.check_consistence_in_config(config)
-
         self.threads = config["THREADS"]
-
-
+        if re.search('/$', config["PATH_DIR_OUT"]):
+            pass
+        else:
+            self.path_out = config["PATH_DIR_OUT"] + '/'
         self.task = []
         self.out_names =[]
         sys.stderr.write("Esses pahts deveriam ter erros! como está indo o mecanismo de procura?" + "\n")
@@ -66,6 +77,9 @@ class Tool:
     def check_consistence_in_config(self, config):
         for key_file, file_path in config.iteritems():
             print key_file, file_path
+            if type(file_path)!=list:
+                if re.match("SKIP", file_path):
+                     config[key_file]=''
             if re.match("PATH", key_file):
                 if re.match("PATH_CREATE", key_file):
                     pass # checar permissoes
@@ -75,20 +89,24 @@ class Tool:
                 elif re.match("PATH_INDEX", key_file):
                     pass
 
+                elif re.match("PATH_DIR_OUT", key_file):
+                    if os.path.isdir(file_path):
+                        pass
+                    else:
+                        os.makedirs(file_path)
                 else:
-
-
                     if type(file_path) == list:
                         for sub_path in file_path:
                             if re.match("PATH_DIR", key_file):
-                                task_check_dir_path(sub_path)
-                            else:
+
                                 task_check_files_path(sub_path)
                     else:
                         if re.match("PATH_DIR", key_file):
                             task_check_dir_path(file_path)
                         else:
                             task_check_files_path(file_path)
+        print 'end'
+
 
     @staticmethod
     def parser_config_file(file):
@@ -102,7 +120,7 @@ class Tool:
                 cfg_line = cfg_line.strip('"')  # removing quotes
                 if cfg_line > 0 and '#' not in cfg_line and '=' in cfg_line:
                     key, value = cfg_line.split('=')
-                    key = key.lower()
+                    key = key.upper()
                     value = value.replace('"', '').replace("'", '')
                     if ':' in value:
                         result = value.split(':')
@@ -113,36 +131,58 @@ class Tool:
                     else:
                         hash_cfg[key]=[]
                         hash_cfg[key].append(result)
+            for key_parse, value_parse in hash_cfg.iteritems(): # remove elements with size 1 from array and transforms it in string
+                if len(value_parse) == 1:
+                    hash_cfg[key_parse]=value_parse[0]
             return hash_cfg
 
-    def cmd_log(self, message):
+    def cmd_log(self,message):
         actual_time = datetime.datetime.now().strftime("%I:%M h on %B %d, %Y")
-        logging.basicConfig(filename='{}.log'.format(self.tool_name), level=logging.DEBUG)
+        logging.basicConfig(filename=self.path_out+'{}.log'.format(self.tool_name), level=logging.DEBUG)
         logging.debug('\n<<{}>> Run on: {}\nCommand:\n{}'.format(self.tool_name, actual_time, message))
 
-    def task_run_cmd(self):
-        print self.task
-        task_array = self.task
-        for task_x in task_array:
-            self.cmd_log(task_x)
-            os.system(task_x)
+    def execute_SYSTEM_command_task(self, my_task):
+            self.cmd_log(my_task)
+            os.system(my_task)
             finished_time = datetime.datetime.now().strftime("%I:%M h on %B %d, %Y")
             logging.debug('\n<<{}>> Finished : {}'.format(self.tool_name, finished_time))
 
+    def task_run_cmd(self):
+        if self.multi_task ==1:
+            #print self.task
+            task_array = self.task
+            for task_x in task_array:
+                self.execute_SYSTEM_command_task(task_x)
+        if self.multi_task > 1 :
+            print 'check if yours resources can run this in parallel jobs'
+            self.task_run_pooL_cmd()
+
+
+
+    def task_run_pooL_cmd(self):
+        task_multi = pool(self.multi_task)
+        task_multi.map(self.execute_SYSTEM_command_task, self.task)
+
+
+
 class TopHat(Tool):
-    def __init__(self, config, tool_name='tophat'):
+    def __init__(self, config, tool_name='tophat', multi_task=1):
 
 
-        Tool.__init__(self, tool_name=tool_name, config=config)
+        Tool.__init__(self, tool_name=tool_name, config=config, multi_task=multi_task)
 
-        self.pairend = bool(self.config['PAIR_END'])
-        self.generate_index_transcriptome = bool(self.config["GENERATE_TRANSCRIPTOME_INDEX"])
+        self.pairend = to_bool(self.config['PAIR_END'])
+
+        self.generate_index_transcriptome = to_bool(self.config["GENERATE_TRANSCRIPTOME_INDEX"])
+        print self.generate_index_transcriptome , 'gerar?', self.config["GENERATE_TRANSCRIPTOME_INDEX"]
         if self.generate_index_transcriptome == True:
             self.transcriptome_index = "--transcriptome-index " + config['PATH_CREATE_TRANSCRIPTOME_INDEX_DIR']
+            self.gtf = '-G '+ self.config["PATH_GTF"]
         if self.generate_index_transcriptome == False:
-            self.transcriptome_index = "--transcriptome-index " + config['PATH_INDEX_TRANSCRIPTOME'].replace('/know', '')+'/know'
+            self.transcriptome_index = "--transcriptome-index " + config['PATH_INDEX_TRANSCRIPTOME'].replace('/ref_index', '')+'/ref_index'
             self.transcriptome_index = self.transcriptome_index.replace('//', '/')
-        self.gtf = self.config["PATH_GTF"]
+            self.gtf='' #if value is equal SKIP, it Turns this value in empty value.
+
         self.genome_index = self.config["PATH_INDEX_GENOME"].replace('/genome', '') + '/genome'
         self.genome_index = self.genome_index.replace('//', '/')
         self.files_in_config = self.config["PATH_READS"]
@@ -151,7 +191,7 @@ class TopHat(Tool):
 
     def generate_out_using_name(self, name):
         if self.pairend == True:
-            out_return = name.split('R1')[0] + "out_tophat"
+            out_return = name.split('_R1_')[0] + "_out_tophat"
             return  out_return
         if self.pairend == False:
             name =  name.split('.')
@@ -163,7 +203,7 @@ class TopHat(Tool):
             for file in array_files:
                 for pair in array_files:
                     if file != pair:
-                        if file.split('_R1')[0] == pair.split('_R2')[0]:
+                        if file.split('_R1_')[0] == pair.split('_R2_')[0]:
                             pairs.append([file, pair])
 
             size_pairs = 0
@@ -197,20 +237,21 @@ class TopHat(Tool):
         if self.pairend == True:
             for R1, R2 in array_reads:
                 out_dir = self.generate_out_using_name(R1)
+                print out_dir
                 self.out_names.append(out_dir)
 
                 self.task.append("{path_tool} -p "
                 "{threads} -o " \
-                "{out_dir} " \
+                " {out_dir} " \
                 " -r 150 --mate-std-dev 150 --library-type fr-secondstrand --b2-sensitive" \
-                " -G {gtf}" \
+                " {gtf}" \
                 " {index_transcriptome}" \
                 " {index_genome}" \
                 " {r1}" \
                 " {r2}".format(
                                 path_tool=self.tool_path,
                                 threads=self.threads,
-                                out_dir=out_dir,
+                                out_dir=self.path_out + out_dir.split('/')[-1],
                                 gtf=self.gtf,
                                 index_transcriptome = self.transcriptome_index,
                                 index_genome=self.genome_index,
@@ -221,6 +262,7 @@ class TopHat(Tool):
 
                 if self.generate_index_transcriptome == True:
                     self.use_created_transcriptome_index()  # In next round use created transcriptome
+                    self.gtf = '' #  Don't use gtf option
         else:
             sys.stderr.write("the unpaired function not is implemented yet" + "\n")
 
@@ -228,8 +270,9 @@ class TopHat(Tool):
 
 def main():
     ''''''
-
-    tophat = TopHat(config={'PATH_TOOL':'' ,
+'''
+    tophat = TopHat(config={'PATH_DIR_OUT:'/work/new/tophat/'
+                            PATH_TOOL':'' ,
                             'THREADS':2 ,
                             'PAIR_END':True ,
                             'GENERATE_TRANSCRIPTOME_INDEX':True ,
@@ -238,6 +281,8 @@ def main():
                             'PATH_INDEX_GENOME':'/work/user/human/genome',
                             'PATH_READS':['/work/teste_fastq_R1.gz','/work/teste_fastq_R2.gz','arquivos/reads_R1.gz', 'arquivos/reads_R2.gz']})
     tophat.task_run_cmd()
+
+    '''
 if __name__ == '__main__':
     sys.exit(main())
 
