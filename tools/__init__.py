@@ -10,12 +10,16 @@ from multiprocessing import Pool
 from functools import partial
 
 
-def execute_SYSTEM_command_task(log_file_name, tool_name_to_log, my_task):
+def execute_SYSTEM_command_task(log_file_name, tool_name_to_log, out_nohup_dir, my_task):
         actual_time = datetime.datetime.now().strftime("%I:%M h on %B %d, %Y")
         logging.basicConfig(filename=log_file_name, level=logging.DEBUG)
-        logging.debug('\n<<{}>> Run on: {}\nCommand:\n{}'.format(tool_name_to_log, actual_time, my_task))
-        #os.system(my_task)
-        finished_time = datetime.datetime.now().strftime("%I:%M h on %B %d, %Y")
+        nohup_out_name = out_nohup_dir+re.sub("\.|-|\s|\/", '_', my_task)
+        nohup_out_name = re.sub('//+|__+', '_',nohup_out_name)
+        cmd = "nohup {my_task} > {nh}".format(my_task= my_task, nh=nohup_out_name)
+        logging.debug('\n<<{}>> Run on: {}\nCommand:\n{}'.format(
+            tool_name_to_log, actual_time, "{}\nNohup_FILE::\nfile-> {}".format(my_task, nohup_out_name)))
+        #os.syste(cmd)
+        finished_time = datetime.datetime.now().strftime("%I:%M  on %B %d, %Y")
         logging.debug('\n<<{}>> Finished : {}'.format(tool_name_to_log, finished_time))
 
 def to_bool(value):
@@ -64,9 +68,6 @@ def task_check_dir_path(dir_path):
     else:
         raise DirNotFound(dir_path)
     return dir_path
-
-
-
 
 class Tool:
     def __init__(self, tool_name, config, multi_task):
@@ -158,7 +159,8 @@ class Tool:
         #    print x , 'task_teste'
         out_log_file_name = self.path_out+'{}.log'.format(self.tool_name)
         tool_name_to_log = self.tool_name
-        execution_multiparameter = partial(execute_SYSTEM_command_task, out_log_file_name, tool_name_to_log)
+        out_dir = self.path_out
+        execution_multiparameter = partial(execute_SYSTEM_command_task, out_log_file_name, tool_name_to_log, out_dir)
         task_multi.map(execution_multiparameter, tasks_array)
 
 

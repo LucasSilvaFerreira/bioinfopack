@@ -1108,7 +1108,7 @@ def all_dir_trimmomatic(diretorio, paired_end=True, threads=5, trimm_path=None, 
         ' LEADING:3' \
         ' TRAILING:3' \
         ' SLIDINGWINDOW:4:15' \
-        ' MINLEN:16'.format(trimm_path=trimm_path,
+        ' MINLEN:20'.format(trimm_path=trimm_path,
                               threads=threads,
                               files_to_trimm=files_to_trimm,
                               adapter=adapters)
