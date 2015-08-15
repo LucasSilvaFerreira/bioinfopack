@@ -1194,7 +1194,8 @@ def bed_start_site_to_tss(bed_string, down = 1000, up = 1000, not_reverse= True)
             Deixa os valores com coordenadas menores na primeria posição mesmo que a fita seja negativa
         '''
     saida_str = ''
-    if '\t-\t' in bed_string:
+    #print bed_string
+    if "\t-" in bed_string:
         bed_string_tabulada =  bed_string.split('\t')
         ref_coord = int(bed_string_tabulada[2])
         n_start= ref_coord + up
@@ -1204,8 +1205,8 @@ def bed_start_site_to_tss(bed_string, down = 1000, up = 1000, not_reverse= True)
         #print (n_start)-(n_end)
         saida_str = '\t'.join(bed_string_tabulada)
     else:
-        ref_coord = int(bed_string[1])
         bed_string_tabulada =  bed_string.split('\t')
+        ref_coord = int(bed_string_tabulada[1])
         n_start= ref_coord - down
         n_end= ref_coord + up
         bed_string_tabulada[1]= str(n_start)
