@@ -7,7 +7,16 @@ import re
 import logging
 import datetime
 from multiprocessing import Pool
+from functools import partial
 
+
+def execute_SYSTEM_command_task(log_file_name, tool_name_to_log, my_task):
+        actual_time = datetime.datetime.now().strftime("%I:%M h on %B %d, %Y")
+        logging.basicConfig(filename=log_file_name, level=logging.DEBUG)
+        logging.debug('\n<<{}>> Run on: {}\nCommand:\n{}'.format(tool_name_to_log, actual_time, my_task))
+        #os.system(my_task)
+        finished_time = datetime.datetime.now().strftime("%I:%M h on %B %d, %Y")
+        logging.debug('\n<<{}>> Finished : {}'.format(tool_name_to_log, finished_time))
 
 def to_bool(value):
     """
@@ -136,34 +145,21 @@ class Tool:
                     hash_cfg[key_parse]=value_parse[0]
             return hash_cfg
 
-    def cmd_log(self,message):
-        actual_time = datetime.datetime.now().strftime("%I:%M h on %B %d, %Y")
-        logging.basicConfig(filename=self.path_out+'{}.log'.format(self.tool_name), level=logging.DEBUG)
-        logging.debug('\n<<{}>> Run on: {}\nCommand:\n{}'.format(self.tool_name, actual_time, message))
-
-    def execute_SYSTEM_command_task(self, my_task):
-            self.cmd_log(my_task)
-            os.system(my_task)
-            finished_time = datetime.datetime.now().strftime("%I:%M h on %B %d, %Y")
-            logging.debug('\n<<{}>> Finished : {}'.format(self.tool_name, finished_time))
 
     def task_run_cmd(self):
-        if self.multi_task == 1:
-            #print self.task
-            task_array = self.task
-            for task_x in task_array:
-                self.execute_SYSTEM_command_task(task_x)
-        if self.multi_task > 1 :
             print 'Check if yours resources can run this in parallel jobs'
-            self.task_run_pooL_cmd()
+            self.task_run_pooL_cmd(self.multi_task, self.task)
 
 
+    def task_run_pooL_cmd(self, p_number, tasks_array):
 
-    def task_run_pooL_cmd(self):
-        task_multi = Pool(self.multi_task)
+        task_multi = Pool(p_number)
         #for x in self.task:
         #    print x , 'task_teste'
-        task_multi.map(os.system, self.task)
+        out_log_file_name = self.path_out+'{}.log'.format(self.tool_name)
+        tool_name_to_log = self.tool_name
+        execution_multiparameter = partial(execute_SYSTEM_command_task, out_log_file_name, tool_name_to_log)
+        task_multi.map(execution_multiparameter, tasks_array)
 
 
 
