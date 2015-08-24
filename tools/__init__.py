@@ -13,12 +13,12 @@ from functools import partial
 def execute_SYSTEM_command_task(log_file_name, tool_name_to_log, out_nohup_dir, my_task):
         actual_time = datetime.datetime.now().strftime("%I:%M h on %B %d, %Y")
         logging.basicConfig(filename=log_file_name, level=logging.DEBUG)
-        nohup_out_name = out_nohup_dir+re.sub("\.|-|\s|\/", '_', my_task)
-        nohup_out_name = re.sub('//+|__+', '_',nohup_out_name)
+        nohup_out_name = out_nohup_dir+'nohup_'+re.sub("\.|-|\s|\/", '_', my_task)+'.out'
+        nohup_out_name = re.sub('//+|__+', '_',nohup_out_name)[0:200]
         cmd = "nohup {my_task} > {nh}".format(my_task= my_task, nh=nohup_out_name)
         logging.debug('\n<<{}>> Run on: {}\nCommand:\n{}'.format(
             tool_name_to_log, actual_time, "{}\nNohup_FILE::\nfile-> {}".format(my_task, nohup_out_name)))
-        #os.syste(cmd)
+        os.system(cmd)
         finished_time = datetime.datetime.now().strftime("%I:%M  on %B %d, %Y")
         logging.debug('\n<<{}>> Finished : {}'.format(tool_name_to_log, finished_time))
 
@@ -82,7 +82,7 @@ class Tool:
             self.path_out = config["PATH_DIR_OUT"] + '/'
         self.task = []
         self.out_names =[]
-        sys.stderr.write("Esses pahts deveriam ter erros! como está indo o mecanismo de procura?" + "\n")
+
 
     def check_consistence_in_config(self, config):
         for key_file, file_path in config.iteritems():
@@ -266,6 +266,48 @@ class TopHat(Tool):
             sys.stderr.write("the unpaired function not is implemented yet" + "\n")
 
 
+class CuffLinks(Tool):
+    def __init__(self, config, tool_name='cufflinks', multi_task=1):
+        Tool.__init__(self, tool_name=tool_name, config=config, multi_task=multi_task)
+        self.gtf = self.config["PATH_GTF"]
+        self.genome_fasta = self.config["PATH_FASTA_GENOME"]
+        self.files_in_config = self.config["PATH_BAM"]
+        self.generate_task(self.files_in_config)
+
+    def generate_task(self, array_bams):
+            for bam_file in array_bams:
+                out_dir = bam_file.split('/')[-2] + "_out_cufflinks"
+                self.out_names.append(out_dir)
+                self.task.append('''cufflinks -p {threads} -o {out_dir} -g {gtf} -b {fasta_genome} --no-faux-reads --library-type fr-secondstrand {bam_accepteds} '''.format(
+                                threads=self.threads,
+                                out_dir=self.path_out + out_dir.split('/')[-1],
+                                gtf=self.gtf,
+                                fasta_genome=self.genome_fasta,
+                                bam_accepteds= bam_file
+                                )
+                )
+
+
+class bam_change_to_chr_tool(Tool):
+    def __init__(self, config, tool_name='samtools', multi_task=1):
+        Tool.__init__(self, tool_name=tool_name, config=config, multi_task=multi_task)
+        self.files = self.config['PATH_FILES']
+
+    def generate_task(self, files):
+            for bam_file in files:
+                out_dir = bam_file.split('.')[-2]
+                new_file_name = "with_chr_" + bam_file.split('/')[-1]
+                self.out_names.append(out_dir)
+                self.task.append('''{tool} view -h {bam} |
+                                perl -pe 's/^(\S+)/chr$1/g' |
+                                {tool} view -bS - > {saida}'''.format(
+                                tool=self.tool_path,
+                                bam= bam_file,
+                                out_dir=self.path_out + out_dir.split('/')[-1] + new_file_name
+
+                                )
+                )
+            print self.task
 
 def main():
     ''''''
