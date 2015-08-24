@@ -292,6 +292,7 @@ class bam_change_to_chr_tool(Tool):
     def __init__(self, config, tool_name='samtools', multi_task=1):
         Tool.__init__(self, tool_name=tool_name, config=config, multi_task=multi_task)
         self.files = self.config['PATH_FILES']
+        self.generate_task(self.files)
 
     def generate_task(self, files):
             for bam_file in files:
@@ -307,7 +308,9 @@ class bam_change_to_chr_tool(Tool):
 
                                 )
                 )
-            print self.task
+                for x in self.tasl:
+                    print x
+           
 
 def main():
     ''''''
