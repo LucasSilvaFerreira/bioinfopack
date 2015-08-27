@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+from sqlalchemy.sql.operators import from_
+
 __author__ = 'lucassilva'
 
 import numpy
@@ -1241,6 +1243,7 @@ def bed_get_midle_point(bed_string):
     -------------------
     string with mid point'''
     bed_string = bed_string.split('\t')
+    #print bed_string
     midpoint = ((int(bed_string[2])-int(bed_string[1]))/2)
     return str(int(bed_string[1]) + midpoint)
 
@@ -1279,6 +1282,47 @@ def fusion_rnaseq_samples(dir):
         get_groups(arquivos_glob)
     else:
         raise DirNotFound("\n{} NOT found...".format(dir))
+
+
+def plot_bed_to_blosest_mark(bed_gene_file, bed_histone_mark, color='g' , plot_name_save=None, label=None, range_plot=None, show=False):
+    '''Given a *bed_gene_file* coord file  and a *bed_histone_mark*, generates a distance density between bedfile and mark midle
+    point mark
+    Returns
+    --------
+        A bedtool object containing the distance in last row between *bed_gene_file* and *bed_histone_*mark'''
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+
+    tss_point = pybedtools.BedTool('\n'.join(['\t'.join(bed_start_site_to_tss(bed_line).split('\t')[0:3])
+                                              for bed_line in abrir_arquivo(bed_gene_file) if bed_line and not re.search('^#', bed_line)]), from_string=True)
+
+
+
+
+
+    mark_midle_point = pybedtools.BedTool('\n'.join([ '{}\t{}\t{}'.format(tss_midle.split('\t')[0], str(bed_get_midle_point(tss_midle)), str(int(bed_get_midle_point(tss_midle))+1))
+                                                     for tss_midle in abrir_arquivo(bed_histone_mark) if tss_midle and not  re.search('^#', tss_midle)]), from_string=True)
+
+
+
+    #print tss_point[0:3]
+    #print mark_midle_point[0:3]
+    closest_feature = tss_point.sort().closest(mark_midle_point.sort(), D='a')
+
+    data_plot = [distance[6] for distance in closest_feature]
+
+    sns.set(style="white", palette="muted")
+
+
+    sns.distplot(data_plot, hist=False, color=color, kde_kws={"shade": False, 'lw': 3},  label=label  )
+    if range_plot:
+        plt.xlim(-range_plot, range_plot)
+    if show:
+        plt.show()
+    if plot_name_save:
+        plt.savefig(plot_name_save+'.eps', format='eps')
+        plt.close()
+    return closest_feature
 
 def main():
     '''Projeto no github..tentando atualizar'''
