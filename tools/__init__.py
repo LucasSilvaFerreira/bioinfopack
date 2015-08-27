@@ -295,21 +295,31 @@ class bam_change_to_chr_tool(Tool):
         self.generate_task(self.files)
 
     def generate_task(self, files):
-            for bam_file in files:
-                out_dir = bam_file.split('.')[-2]
-                new_file_name = "with_chr_" + bam_file.split('/')[-1]
+
+        for bam_file in files:
+            if type(bam_file) ==  list:
+                out_dir = bam_file[0].split('.')[-2]
+                os.system("mkdir {}{}".format(self.path_out, bam_file[1]))
+                new_file_name = "with_chr_" + bam_file[0].split('/')[-1]
                 self.out_names.append(out_dir)
-                self.task.append('''{tool} view -h {bam} |
-                                perl -pe 's/^(\S+)/chr$1/g' |
-                                {tool} view -bS - > {saida}'''.format(
+                self.task.append('''{tool} view -h {bam} |perl -pe "s/\tSN:/\tSN:chr/g" |{tool} view -bS - > {saida}'''.format(
                                 tool=self.tool_path,
-                                bam= bam_file,
-                                out_dir=self.path_out + out_dir.split('/')[-1] + new_file_name
+                                bam=bam_file[0],
+                                saida=self.path_out +bam_file[1]+ "/" + new_file_name
 
                                 )
                 )
-                for x in self.tasl:
-                    print x
+            else:
+                raise ExperimentDesignError('\nThe file need a output value.\n'
+                                            'ex: PATH_FILE=/your/file/sample01_file.bam:my_sample01 )\n'
+                                            'This is create a new dir with "my_sample01" name.\n{bam_file}'.format(bam_file=bam_file))
+                sys.exit()
+
+        for x in self.task:
+            print x
+
+
+
            
 
 def main():
