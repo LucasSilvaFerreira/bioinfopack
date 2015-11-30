@@ -1324,6 +1324,40 @@ def plot_bed_to_blosest_mark(bed_gene_file, bed_histone_mark, color='g' , plot_n
         plt.close()
     return closest_feature
 
+
+def array_to_unique_complex_patern(array_in, line_array, last=True):
+    '''Given an *array_in* and an  *line_pattern* corresponding the pattern combination formed with different lines.
+        Returns a uniq line occurrence of this line pattern.
+
+        array_in : array
+            An array file
+        line_pattern :  array
+            Array with a combination of line to merge.This lines will generate a uniq id to be searched in que *array_in*
+        last : bool(True)
+            Returns just the line occurrence in duplicated values.
+            False, gives all values duplicated in the same line separated by '_:_'
+
+        Return
+            Returns a array with just the last occurrence of pattern chosen
+            If last is False, returns an array of arrays
+
+        '''
+
+    hash_array = {}
+    for line_to_key in array_in:
+        id = '_'.join([str(line_to_key[line_number]) for line_number in line_array])
+        if id in hash_array:
+            hash_array[id].append(line_to_key)
+        else:
+            hash_array[id]=[]
+            hash_array[id].append(line_to_key)
+    if last:
+        return [value_hash_array[-1] for value_hash_array in  hash_array.itervalues()]
+    else:
+        return [[value_hash_array] for value_hash_array in  hash_array.itervalues()]
+
+
+
 def main():
     '''Projeto no github..tentando atualizar'''
 
